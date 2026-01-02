@@ -2,205 +2,225 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Master Timer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ESP32 Controller</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', sans-serif;
-            background-color: #222;
-            color: white;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            transition: background-color 0.5s;
-        }
-
-        /* DYNAMIC BACKGROUNDS */
-        body.green { background-color: #27ae60; }
-        body.amber { background-color: #f39c12; }
-        body.red { background-color: #c0392b; }
-        body.flash { animation: blinking 0.5s infinite; background-color: #c0392b; }
-        body.blackout { background-color: #000 !important; color: #333 !important; }
-
-        @keyframes blinking {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        /* LARGE DISPLAY */
-        #timer-text {
-            font-size: 25vw;
-            font-weight: bold;
-            line-height: 1;
-        }
-
-        #message-text {
-            font-size: 4vw;
-            margin-top: 10px;
-            font-weight: 300;
-        }
-
-        /* CONTROL PANEL (Hidden by default, swipe/hover to see) */
-        #controls {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background: rgba(255,255,255,0.95);
-            color: #333;
-            padding: 20px;
-            box-shadow: 0 -5px 15px rgba(0,0,0,0.3);
-            transform: translateY(92%); /* Peeking out */
-            transition: transform 0.3s;
-            z-index: 100;
-        }
-        #controls:hover, #controls.active { transform: translateY(0); }
-
-        .row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;}
-        button {
-            padding: 12px 18px;
-            font-size: 16px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            background: #e0e0e0;
-            flex: 1;
-        }
-        button.primary { background: #3498db; color: white; }
-        button.danger { background: #e74c3c; color: white; }
-        button.connect { background: #2c3e50; color: white; font-weight: bold; }
+        :root { --bg: #121212; --panel: #1e1e1e; --text: #fff; --accent: #3b82f6; --danger: #ef4444; --warn: #eab308; --success: #22c55e; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
         
-        input { padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: 60px; }
-        label { font-size: 12px; font-weight: bold; color: #555; }
+        /* HEADER & STATUS */
+        .header { display: flex; justify-content: space-between; align-items: center; background: var(--panel); padding: 15px; border-radius: 12px; }
+        #status-dot { height: 12px; width: 12px; background: var(--danger); border-radius: 50%; display: inline-block; }
+        .connected #status-dot { background: var(--success); box-shadow: 0 0 10px var(--success); }
+
+        /* PREVIEW SCREEN */
+        #preview-box {
+            background: #000; border: 4px solid #333; height: 120px; border-radius: 8px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            position: relative; transition: background 0.3s;
+        }
+        #p-timer { font-size: 3rem; font-weight: bold; line-height: 1; }
+        #p-msg { font-size: 1rem; margin-top: 5px; color: #aaa; }
+
+        /* CONTROLS */
+        .panel { background: var(--panel); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 10px; }
+        label { font-size: 0.85rem; text-transform: uppercase; color: #888; font-weight: bold; }
+        
+        /* BUTTONS & INPUTS */
+        .btn-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .btn-act-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+        
+        button { border: none; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; background: #333; color: white; transition: 0.2s; }
+        button:active { transform: scale(0.96); }
+        .btn-blue { background: var(--accent); }
+        .btn-green { background: var(--success); color: black; }
+        .btn-red { background: var(--danger); }
+        .btn-warn { background: var(--warn); color: black; }
+        
+        input { background: #2a2a2a; border: 1px solid #444; padding: 10px; color: white; border-radius: 6px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+        
+        /* TOGGLES */
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; background: #2a2a2a; padding: 10px; border-radius: 6px; margin-top: 5px; }
+        input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); }
+
     </style>
 </head>
-<body class="green">
+<body>
 
-    <div id="timer-text">--:--</div>
-    <div id="message-text">Not Connected</div>
+    <div class="header" id="header">
+        <h2 style="margin:0">Stage Timer</h2>
+        <div>
+            <span id="status-text">Disconnected</span>
+            <div id="status-dot"></div>
+        </div>
+    </div>
+    <button class="btn-blue" id="btn-connect" style="width:100%">CONNECT TO SCREEN</button>
 
-    <div id="controls">
-        <div class="row" style="border-bottom: 1px solid #ddd; padding-bottom: 10px;">
-            <button class="connect" onclick="connectToESP32()">📡 Connect to ESP32</button>
-            <button onclick="toggleControls()">Toggle Panel</button>
+    <div id="preview-box">
+        <div id="p-timer">--:--</div>
+        <div id="p-msg"></div>
+    </div>
+
+    <div class="panel">
+        <label>Presets (Min)</label>
+        <div class="btn-row">
+            <button onclick="setTimer(5)">5</button>
+            <button onclick="setTimer(10)">10</button>
+            <button onclick="setTimer(15)">15</button>
+            <button onclick="setTimer(20)">20</button>
+        </div>
+        
+        <label style="margin-top:10px">Manual Set (Min)</label>
+        <div style="display:flex; gap:10px">
+            <input type="number" id="inp-min" value="5" placeholder="Min">
+            <button class="btn-blue" onclick="sendCustomTime()" style="width:auto">SET</button>
         </div>
 
-        <div class="row">
-            <button onclick="sendTime(5)">5 Min</button>
-            <button onclick="sendTime(10)">10 Min</button>
-            <button onclick="sendTime(15)">15 Min</button>
-            <button onclick="sendTime(20)">20 Min</button>
+        <div class="btn-act-row">
+            <button class="btn-green" onclick="sendCmd('START')">START</button>
+            <button class="btn-red" onclick="sendCmd('STOP')">STOP</button>
+            <button class="btn-warn" onclick="sendCmd('RESET')">RESET</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <label>Alert Thresholds (Min)</label>
+        <div style="display:flex; gap:10px">
+            <input type="number" id="cfg-amber" value="2" placeholder="Amber">
+            <input type="number" id="cfg-red" value="0" placeholder="Red">
+            <button class="btn-blue" onclick="sendConfig()">CFG</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <label>Message Center</label>
+        <input type="text" id="inp-msg" placeholder="Enter message...">
+        
+        <div class="toggle-row">
+            <span>Full Screen Mode</span>
+            <input type="checkbox" id="chk-fs" onchange="toggleFS()">
+        </div>
+        <div class="toggle-row">
+            <span>Flash Screen</span>
+            <input type="checkbox" id="chk-fl" onchange="toggleFlash()">
         </div>
 
-        <div class="row">
-             <input type="number" id="custom-min" placeholder="Min" value="30">
-             <button onclick="sendTime(document.getElementById('custom-min').value)">Set Custom</button>
-        </div>
-
-        <div class="row">
-            <button class="primary" onclick="sendCommand('START')">Resume</button>
-            <button class="primary" onclick="sendCommand('PAUSE')">Pause</button>
-            <button class="danger" onclick="sendCommand('RESET')">Reset</button>
-        </div>
-
-        <div class="row">
-            <div>
-                <label>Amber (min):</label>
-                <input type="number" id="amber-cfg" value="2">
-            </div>
-            <div>
-                <label>Red (min):</label>
-                <input type="number" id="red-cfg" value="0">
-            </div>
-            <button onclick="sendConfig()">Update Colors</button>
-        </div>
-
-        <div class="row" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top:10px;">
-            <label style="width:100%;">LOCAL OVERRIDES (Does not affect ESP32)</label>
-            <button onclick="document.body.classList.toggle('blackout')">Show/Hide Screen</button>
-            <button onclick="document.getElementById('message-text').innerText = prompt('Set Message:')">Set Message</button>
+        <div class="btn-act-row">
+            <button class="btn-blue" style="grid-column:span 2" onclick="sendMessage()">SEND TEXT</button>
+            <button class="btn-red" onclick="sendCmd('CLR')">CLEAR</button>
         </div>
     </div>
 
     <script>
-        // --- BLUETOOTH CONFIG ---
-        const SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb"; 
+        // UUIDs MUST MATCH ESP32
+        const SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
         const CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
 
-        let bleDevice, bleCharacteristic;
+        let device, server, service, characteristic;
 
-        async function connectToESP32() {
+        const btnConnect = document.getElementById('btn-connect');
+        const header = document.getElementById('header');
+        const pTimer = document.getElementById('p-timer');
+
+        btnConnect.addEventListener('click', connectBLE);
+
+        async function connectBLE() {
             try {
-                document.getElementById('message-text').innerText = "Scanning...";
-                bleDevice = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [0xFFE0] }], // Standard HM-10 / ESP32 UUID
-                    optionalServices: [SERVICE_UUID]
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [SERVICE_UUID] }] // Look for FFE0
                 });
 
-                const server = await bleDevice.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                bleCharacteristic = await service.getCharacteristic(CHAR_UUID);
-
-                // Listen for updates from ESP32
-                await bleCharacteristic.startNotifications();
-                bleCharacteristic.addEventListener('characteristicvaluechanged', handleUpdate);
-
-                document.getElementById('message-text').innerText = "Connected";
+                btnConnect.innerText = "Connecting...";
                 
-                // On connect, push the current color config
+                device.addEventListener('gattserverdisconnected', onDisconnect);
+
+                server = await device.gatt.connect();
+                service = await server.getPrimaryService(SERVICE_UUID);
+                characteristic = await service.getCharacteristic(CHAR_UUID);
+
+                // Start Notifications (Listen to ESP32)
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', handleNotify);
+
+                // UI Updates
+                header.classList.add('connected');
+                document.getElementById('status-text').innerText = "Connected";
+                btnConnect.style.display = 'none';
+
+                // Send Initial Config
                 sendConfig();
 
             } catch (error) {
                 console.error(error);
-                document.getElementById('message-text').innerText = "Connection Failed";
+                alert("Connection Failed: " + error);
+                btnConnect.innerText = "CONNECT TO SCREEN";
             }
         }
 
-        // --- HANDLE DATA FROM ESP32 ---
-        function handleUpdate(event) {
-            const value = new TextDecoder().decode(event.target.value);
-            // Expected format: "TIME:MM:SS|color"
-            console.log("ESP32 says:", value);
-
-            if (value.startsWith("TIME:")) {
-                const parts = value.split('|');
-                const timeStr = parts[0].substring(5); // Remove 'TIME:'
-                const colorStr = parts[1];
-
-                document.getElementById('timer-text').innerText = timeStr;
-                
-                // Update background color based on ESP32 decision
-                document.body.className = colorStr; 
-            }
+        function onDisconnect() {
+            header.classList.remove('connected');
+            document.getElementById('status-text').innerText = "Disconnected";
+            btnConnect.style.display = 'block';
+            btnConnect.innerText = "CONNECT TO SCREEN";
+            pTimer.innerText = "--:--";
         }
 
-        // --- SEND COMMANDS TO ESP32 ---
-        async function sendCommand(cmd) {
-            if (!bleCharacteristic) return;
+        // --- SENDING COMMANDS ---
+        
+        async function sendCmd(cmd) {
+            if (!characteristic) return;
             const encoder = new TextEncoder();
-            await bleCharacteristic.writeValue(encoder.encode(cmd));
+            await characteristic.writeValue(encoder.encode(cmd));
         }
 
-        async function sendTime(minutes) {
-            const seconds = minutes * 60;
-            await sendCommand("SET:" + seconds);
+        function setTimer(min) {
+            const sec = min * 60;
+            sendCmd(`SET:${sec}`);
         }
 
-        async function sendConfig() {
-            const amber = parseInt(document.getElementById('amber-cfg').value) * 60;
-            const red = parseInt(document.getElementById('red-cfg').value) * 60;
-            // Format: CFG:amberSec,redSec
-            await sendCommand(`CFG:${amber},${red}`);
+        function sendCustomTime() {
+            const min = parseInt(document.getElementById('inp-min').value) || 0;
+            setTimer(min);
         }
 
-        function toggleControls() {
-            document.getElementById('controls').classList.toggle('active');
+        function sendConfig() {
+            const amber = parseInt(document.getElementById('cfg-amber').value) || 2;
+            const red = parseInt(document.getElementById('cfg-red').value) || 0;
+            // Convert mins to seconds for internal logic if needed, 
+            // but ESP32 code expects mins for thresholds based on your prompt logic?
+            // Actually, your C++ uses raw seconds in loop but ints for variables.
+            // Let's send SECONDS to be safe with the ESP32 logic:
+            sendCmd(`CFG:${amber*60},${red*60}`);
         }
+
+        function sendMessage() {
+            const msg = document.getElementById('inp-msg').value;
+            sendCmd(`MSG:${msg}`);
+        }
+
+        function toggleFS() {
+            const isChecked = document.getElementById('chk-fs').checked;
+            sendCmd(isChecked ? "FS:ON" : "FS:OFF");
+        }
+
+        function toggleFlash() {
+            const isChecked = document.getElementById('chk-fl').checked;
+            sendCmd(isChecked ? "FL:ON" : "FL:OFF");
+        }
+
+        // --- RECEIVING DATA ---
+
+        function handleNotify(event) {
+            const value = event.target.value;
+            const decoder = new TextDecoder('utf-8');
+            const data = decoder.decode(value);
+            
+            // Expected format: "TIME:05:00"
+            if (data.startsWith("TIME:")) {
+                pTimer.innerText = data.substring(5);
+            }
+        }
+
     </script>
 </body>
 </html>
