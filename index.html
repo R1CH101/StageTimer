@@ -14,7 +14,7 @@
             display: flex; flex-direction:column; align-items: center; justify-content: center;
             border-bottom: 4px solid #333; position: sticky; top:0; z-index:10;
         }
-        #p-time { font-size: 4.5rem; font-weight: 800; line-height: 1; margin:0;}
+        #p-time { font-size: 4.5rem; font-weight: 800; line-height: 1; margin:0; transition: color 0.3s;}
         #p-msg { font-size: 1.2rem; margin-top: 5px; text-align: center; height: 1.5em; overflow:hidden;}
         
         .status-bar { font-size: 0.8rem; color: #666; width:100%; text-align:center; background:#111; padding:5px 0;}
@@ -84,7 +84,7 @@
                 <input type="checkbox" id="chk-fs">
             </div>
             <div class="toggle-row">
-                <span>Flash Screen</span>
+                <span>Flash (Red/Green)</span>
                 <input type="checkbox" id="chk-fl">
             </div>
 
@@ -124,9 +124,8 @@
         const SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
         const CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
         let char;
-        
-        let currentSec = 0;
         let isRunning = false;
+        let currentSec = 0;
         let amberTriggered = false;
         let redTriggered = false;
 
@@ -176,24 +175,32 @@
                 document.getElementById('p-time').innerText = p[0];
                 document.getElementById('p-msg').style.color = p[2];
                 document.getElementById('p-msg').innerText = p[3] || "";
-
-                // Parse logic
-                let timeParts = p[0].replace('-','').split(':');
-                let sec = (parseInt(timeParts[0])*60) + parseInt(timeParts[1]);
-                if(p[0].includes('-')) sec = -sec;
                 
-                currentSec = sec;
-                checkAutoAlerts(p[3]); // Pass current msg to checker
+                // Logic for auto-alerts
+                let timeParts = p[0].replace('-','').split(':');
+                if(timeParts.length === 2) {
+                    let sec = (parseInt(timeParts[0])*60) + parseInt(timeParts[1]);
+                    if(p[0].includes('-')) sec = -sec;
+                    currentSec = sec;
+                    checkAutoAlerts(p[3]); 
+                }
             }
         }
 
         async function sendCmd(c) {
             if(!char) return;
-            await char.writeValue(new TextEncoder().encode(c));
-            if(c === "RESET" || c.startsWith("SET")) {
-                amberTriggered = false; redTriggered = false; isRunning = false;
-            }
-            if(c === "START") isRunning = true;
+            try {
+                // Burst send to ensure delivery (Reliability Fix)
+                const enc = new TextEncoder().encode(c);
+                await char.writeValue(enc);
+                // Tiny delays to prevent stack flooding
+                setTimeout(() => char.writeValue(enc), 50); 
+                
+                if(c === "RESET" || c.startsWith("SET")) {
+                    amberTriggered = false; redTriggered = false; isRunning = false;
+                }
+                if(c === "START") isRunning = true;
+            } catch(e) { console.log("Send retry..."); }
         }
 
         function setPreset(min) {
@@ -213,8 +220,6 @@
             const dur = document.getElementById('msg-dur').value;
             const fs = document.getElementById('chk-fs').checked ? "1" : "0";
             const fl = document.getElementById('chk-fl').checked ? "1" : "0";
-            
-            // CMD Format: MSG:Text|Duration|FullScrn|Flash
             sendCmd(`MSG:${txt}|${dur}|${fs}|${fl}`);
         }
 
@@ -226,7 +231,6 @@
 
         function checkAutoAlerts(currentMsgOnScreen) {
             if(!isRunning) return;
-            // Only trigger if no message is currently on screen (or message is empty)
             if(currentMsgOnScreen && currentMsgOnScreen.length > 0) return;
 
             const at = document.getElementById('def-amber-t').value * 60;
@@ -234,7 +238,7 @@
             
             if(currentSec <= at && currentSec > rt && !amberTriggered) {
                 const msg = document.getElementById('def-amber-msg').value;
-                if(msg) sendCmd(`MSG:${msg}|10|0|0`); // Auto show for 10s
+                if(msg) sendCmd(`MSG:${msg}|10|0|0`);
                 amberTriggered = true;
             }
             if(currentSec <= rt && !redTriggered) {
