@@ -3,427 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Robust BLE Presentation Timer</title>
+    <title>ESP32 Master Timer</title>
     <style>
-        /* --- CSS STYLES --- */
-        body, html {
+        body {
             margin: 0;
             padding: 0;
-            height: 100%;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
             background-color: #222;
-            transition: background-color 1s ease;
-        }
-
-        /* STATE COLORS */
-        body.state-green { background-color: #2ecc71; color: white; }
-        body.state-amber { background-color: #f39c12; color: white; }
-        body.state-red { background-color: #c0392b; color: white; }
-        body.state-black { background-color: #000000; color: #333; } /* Hidden mode */
-
-        /* MAIN DISPLAY CONTAINER */
-        #display-container {
+            color: white;
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
-            height: 100%;
-            text-align: center;
-            position: relative;
-            z-index: 1;
+            justify-content: center;
+            transition: background-color 0.5s;
         }
 
-        /* TIMER TEXT */
-        #timer-display {
-            font-size: 25vw; /* Massive responsive text */
+        /* DYNAMIC BACKGROUNDS */
+        body.green { background-color: #27ae60; }
+        body.amber { background-color: #f39c12; }
+        body.red { background-color: #c0392b; }
+        body.flash { animation: blinking 0.5s infinite; background-color: #c0392b; }
+        body.blackout { background-color: #000 !important; color: #333 !important; }
+
+        @keyframes blinking {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* LARGE DISPLAY */
+        #timer-text {
+            font-size: 25vw;
             font-weight: bold;
             line-height: 1;
-            font-variant-numeric: tabular-nums;
-            opacity: 1;
-            transition: opacity 0.5s;
         }
 
-        /* MESSAGE TEXT */
-        #message-display {
-            font-size: 5vw;
-            margin-top: 20px;
-            min-height: 1.2em;
+        #message-text {
+            font-size: 4vw;
+            margin-top: 10px;
             font-weight: 300;
         }
 
-        /* OVERLAY MESSAGE (Flash Message) */
-        #flash-overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.85);
-            color: white;
-            padding: 40px;
-            border-radius: 20px;
-            font-size: 4vw;
-            z-index: 10;
-            display: none; /* Hidden by default */
-            border: 2px solid white;
-        }
-
-        /* CONTROL PANEL (The Override Dashboard) */
+        /* CONTROL PANEL (Hidden by default, swipe/hover to see) */
         #controls {
-            position: absolute;
+            position: fixed;
             bottom: 0;
             left: 0;
             width: 100%;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255,255,255,0.95);
             color: #333;
             padding: 20px;
-            box-sizing: border-box;
-            transform: translateY(90%); /* Hides most of it */
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.3);
+            transform: translateY(92%); /* Peeking out */
             transition: transform 0.3s;
-            z-index: 20;
-            border-top: 5px solid #666;
+            z-index: 100;
         }
+        #controls:hover, #controls.active { transform: translateY(0); }
 
-        #controls:hover, #controls.active {
-            transform: translateY(0); /* Slide up on hover */
-        }
-
-        .panel-label {
-            font-size: 12px;
-            text-transform: uppercase;
-            font-weight: bold;
-            color: #666;
-            margin-top: 10px;
-            display: block;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-            flex-wrap: wrap;
-        }
-
+        .row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;}
         button {
-            padding: 10px 15px;
+            padding: 12px 18px;
+            font-size: 16px;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            background: #ddd;
-            font-weight: bold;
+            background: #e0e0e0;
+            flex: 1;
         }
-
-        button:hover { background: #ccc; }
         button.primary { background: #3498db; color: white; }
         button.danger { background: #e74c3c; color: white; }
-        button.ble-btn { background: #2c3e50; color: white; }
-
-        input { padding: 8px; width: 80px; }
+        button.connect { background: #2c3e50; color: white; font-weight: bold; }
         
-        .status-bar {
-            font-size: 12px;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #ccc;
-            display: flex;
-            justify-content: space-between;
-        }
-        
-        #ble-status { font-weight: bold; color: #e74c3c; }
-        #ble-status.connected { color: #2ecc71; }
-
-        /* Utility classes */
-        .hidden { opacity: 0 !important; }
+        input { padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: 60px; }
+        label { font-size: 12px; font-weight: bold; color: #555; }
     </style>
 </head>
-<body class="state-green">
+<body class="green">
 
-    <div id="display-container">
-        <div id="timer-display">00:00</div>
-        <div id="message-display">Ready</div>
-    </div>
-
-    <div id="flash-overlay">Priority Message</div>
+    <div id="timer-text">--:--</div>
+    <div id="message-text">Not Connected</div>
 
     <div id="controls">
-        <div class="status-bar">
-            <span>Hover here to control manually</span>
-            <span id="ble-status">BLE: Disconnected</span>
+        <div class="row" style="border-bottom: 1px solid #ddd; padding-bottom: 10px;">
+            <button class="connect" onclick="connectToESP32()">📡 Connect to ESP32</button>
+            <button onclick="toggleControls()">Toggle Panel</button>
         </div>
 
-        <div class="panel-section">
-            <span class="panel-label">Bluetooth Connection</span>
-            <button class="ble-btn" onclick="connectBluetooth()">Connect to Remote</button>
+        <div class="row">
+            <button onclick="sendTime(5)">5 Min</button>
+            <button onclick="sendTime(10)">10 Min</button>
+            <button onclick="sendTime(15)">15 Min</button>
+            <button onclick="sendTime(20)">20 Min</button>
         </div>
 
-        <div class="panel-section">
-            <span class="panel-label">Start Timer (Minutes)</span>
-            <div class="btn-group">
-                <button onclick="startTimer(5)">5m</button>
-                <button onclick="startTimer(10)">10m</button>
-                <button onclick="startTimer(15)">15m</button>
-                <button onclick="startTimer(20)">20m</button>
-                <input type="number" id="custom-min" placeholder="Min" value="30">
-                <button onclick="startTimer(parseInt(document.getElementById('custom-min').value))">Go</button>
-            </div>
-            <div class="btn-group">
-                <button class="primary" onclick="pauseTimer()">Pause/Resume</button>
-                <button class="danger" onclick="resetTimer()">Reset</button>
-            </div>
+        <div class="row">
+             <input type="number" id="custom-min" placeholder="Min" value="30">
+             <button onclick="sendTime(document.getElementById('custom-min').value)">Set Custom</button>
         </div>
 
-        <div class="panel-section">
-            <span class="panel-label">Threshold Settings (Triggers)</span>
-            <div class="btn-group">
-                <label>Amber at: <input type="number" id="amber-set" value="2"> min left</label>
-                <label>Red at: <input type="number" id="red-set" value="0"> min left</label>
-            </div>
+        <div class="row">
+            <button class="primary" onclick="sendCommand('START')">Resume</button>
+            <button class="primary" onclick="sendCommand('PAUSE')">Pause</button>
+            <button class="danger" onclick="sendCommand('RESET')">Reset</button>
         </div>
 
-        <div class="panel-section">
-            <span class="panel-label">Overrides & Messages</span>
-            <div class="btn-group">
-                <button onclick="toggleTimerVisibility()">Show/Hide Timer</button>
-                <button onclick="forceColor('green')">Force Green</button>
-                <button onclick="forceColor('amber')">Force Amber</button>
-                <button onclick="forceColor('red')">Force Red</button>
+        <div class="row">
+            <div>
+                <label>Amber (min):</label>
+                <input type="number" id="amber-cfg" value="2">
             </div>
-            <div class="btn-group" style="margin-top:5px;">
-                <input type="text" id="msg-input" placeholder="Lower Message" style="width: 200px;">
-                <button onclick="setLowerMessage(document.getElementById('msg-input').value)">Set Msg</button>
-                
-                <input type="text" id="flash-input" placeholder="Flash Message" style="width: 200px;">
-                <button onclick="showFlashMessage(document.getElementById('flash-input').value)">Flash Msg</button>
+            <div>
+                <label>Red (min):</label>
+                <input type="number" id="red-cfg" value="0">
             </div>
+            <button onclick="sendConfig()">Update Colors</button>
+        </div>
+
+        <div class="row" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top:10px;">
+            <label style="width:100%;">LOCAL OVERRIDES (Does not affect ESP32)</label>
+            <button onclick="document.body.classList.toggle('blackout')">Show/Hide Screen</button>
+            <button onclick="document.getElementById('message-text').innerText = prompt('Set Message:')">Set Message</button>
         </div>
     </div>
 
     <script>
-        // --- CONFIGURATION ---
-        // Change these UUIDs to match your specific BLE device (e.g., Arduino/ESP32 UUIDs)
-        const BLE_SERVICE_UUID = 0xFFE0; 
-        const BLE_CHAR_UUID = 0xFFE1;
+        // --- BLUETOOTH CONFIG ---
+        const SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb"; 
+        const CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
 
-        // --- STATE MANAGEMENT ---
-        let totalSeconds = 0;
-        let currentSeconds = 0;
-        let timerInterval = null;
-        let isRunning = false;
-        let amberThresholdSec = 120; // Default 2 mins
-        let redThresholdSec = 0;     // Default 0 mins
-        let bleDevice = null;
-        let bleServer = null;
+        let bleDevice, bleCharacteristic;
 
-        // DOM Elements
-        const timerDisplay = document.getElementById('timer-display');
-        const messageDisplay = document.getElementById('message-display');
-        const flashOverlay = document.getElementById('flash-overlay');
-        const body = document.body;
-        const bleStatus = document.getElementById('ble-status');
-
-        // --- TIMER ENGINE ---
-        
-        function startTimer(minutes) {
-            clearInterval(timerInterval);
-            
-            // Get thresholds from inputs
-            const amberMin = parseInt(document.getElementById('amber-set').value) || 2;
-            const redMin = parseInt(document.getElementById('red-set').value) || 0;
-            
-            amberThresholdSec = amberMin * 60;
-            redThresholdSec = redMin * 60;
-
-            totalSeconds = minutes * 60;
-            currentSeconds = totalSeconds;
-            
-            isRunning = true;
-            updateDisplay();
-            updateBackground(); // Set initial color
-            
-            timerInterval = setInterval(() => {
-                if (currentSeconds > 0) {
-                    currentSeconds--;
-                    updateDisplay();
-                    updateBackground();
-                } else {
-                    // Timer finished (Stay Red, go negative? Or stop?)
-                    // Let's stop at 00:00 for now, or you can allow negative count
-                    currentSeconds = 0; 
-                    clearInterval(timerInterval);
-                    isRunning = false;
-                    blinkScreen();
-                }
-            }, 1000);
-        }
-
-        function pauseTimer() {
-            if (isRunning) {
-                clearInterval(timerInterval);
-                isRunning = false;
-            } else {
-                if (currentSeconds > 0) {
-                    isRunning = true;
-                    timerInterval = setInterval(() => {
-                        if (currentSeconds > 0) {
-                            currentSeconds--;
-                            updateDisplay();
-                            updateBackground();
-                        } else {
-                            clearInterval(timerInterval);
-                            isRunning = false;
-                            blinkScreen();
-                        }
-                    }, 1000);
-                }
-            }
-        }
-
-        function resetTimer() {
-            clearInterval(timerInterval);
-            isRunning = false;
-            currentSeconds = 0;
-            timerDisplay.textContent = "00:00";
-            messageDisplay.textContent = "Ready";
-            body.className = "state-green";
-        }
-
-        // --- VISUAL LOGIC ---
-
-        function updateDisplay() {
-            const m = Math.floor(currentSeconds / 60);
-            const s = currentSeconds % 60;
-            timerDisplay.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        }
-
-        function updateBackground() {
-            // Priority: Red > Amber > Green
-            // Logic: If time remaining is LESS than threshold
-            if (currentSeconds <= redThresholdSec) {
-                body.className = "state-red";
-            } else if (currentSeconds <= amberThresholdSec) {
-                body.className = "state-amber";
-            } else {
-                body.className = "state-green";
-            }
-        }
-
-        function forceColor(color) {
-            // Overrides automatic color logic temporarily
-            // Note: The next timer tick (1 sec) will reset this unless we pause logic
-            // For a hard override, pause timer or set a flag. 
-            // Here we just set it visually.
-            body.className = `state-${color}`;
-        }
-
-        function blinkScreen() {
-            let count = 0;
-            const blinkInterval = setInterval(() => {
-                body.style.opacity = (body.style.opacity == '0' ? '1' : '0');
-                count++;
-                if(count > 5) {
-                    clearInterval(blinkInterval);
-                    body.style.opacity = '1';
-                }
-            }, 300);
-        }
-
-        function toggleTimerVisibility() {
-            timerDisplay.classList.toggle('hidden');
-        }
-
-        function setLowerMessage(msg) {
-            messageDisplay.textContent = msg;
-        }
-
-        function showFlashMessage(msg) {
-            flashOverlay.textContent = msg;
-            flashOverlay.style.display = 'block';
-            // Hide after 5 seconds automatically, or click to hide
-            setTimeout(() => {
-                flashOverlay.style.display = 'none';
-            }, 5000);
-        }
-
-        // --- BLUETOOTH LOGIC ---
-
-        async function connectBluetooth() {
+        async function connectToESP32() {
             try {
-                bleStatus.textContent = "BLE: Scanning...";
-                
-                // Request Device (User gesture required)
+                document.getElementById('message-text').innerText = "Scanning...";
                 bleDevice = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [BLE_SERVICE_UUID] }] 
-                    // Or use acceptAllDevices: true and optionalServices: [BLE_SERVICE_UUID]
+                    filters: [{ services: [0xFFE0] }], // Standard HM-10 / ESP32 UUID
+                    optionalServices: [SERVICE_UUID]
                 });
 
-                // Add Disconnect Listener
-                bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-
                 const server = await bleDevice.gatt.connect();
-                bleServer = server;
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                bleCharacteristic = await service.getCharacteristic(CHAR_UUID);
+
+                // Listen for updates from ESP32
+                await bleCharacteristic.startNotifications();
+                bleCharacteristic.addEventListener('characteristicvaluechanged', handleUpdate);
+
+                document.getElementById('message-text').innerText = "Connected";
                 
-                const service = await server.getPrimaryService(BLE_SERVICE_UUID);
-                const characteristic = await service.getCharacteristic(BLE_CHAR_UUID);
-
-                // Enable Notifications
-                await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', handleBleMessage);
-
-                bleStatus.textContent = "BLE: Connected (" + bleDevice.name + ")";
-                bleStatus.classList.add('connected');
+                // On connect, push the current color config
+                sendConfig();
 
             } catch (error) {
                 console.error(error);
-                bleStatus.textContent = "BLE: Error " + error;
+                document.getElementById('message-text').innerText = "Connection Failed";
             }
         }
 
-        function onDisconnected(event) {
-            bleStatus.textContent = "BLE: Disconnected (Timer Running)";
-            bleStatus.classList.remove('connected');
-            console.log("Bluetooth device disconnected. Timer state preserved.");
-            // Note: We do NOT stop the timer here. Feature requested.
-        }
+        // --- HANDLE DATA FROM ESP32 ---
+        function handleUpdate(event) {
+            const value = new TextDecoder().decode(event.target.value);
+            // Expected format: "TIME:MM:SS|color"
+            console.log("ESP32 says:", value);
 
-        function handleBleMessage(event) {
-            const value = event.target.value;
-            const decoder = new TextDecoder('utf-8');
-            const command = decoder.decode(value).trim();
-            console.log("Received BLE Command:", command);
-            
-            processCommand(command);
-        }
+            if (value.startsWith("TIME:")) {
+                const parts = value.split('|');
+                const timeStr = parts[0].substring(5); // Remove 'TIME:'
+                const colorStr = parts[1];
 
-        // --- COMMAND PARSER ---
-        // Expects strings like: "5", "START", "STOP", "MSG:Hello", "COLOR:RED"
-        function processCommand(cmd) {
-            const upperCmd = cmd.toUpperCase();
-
-            // Timer Presets
-            if (upperCmd === "5" || upperCmd === "5M") startTimer(5);
-            else if (upperCmd === "10" || upperCmd === "10M") startTimer(10);
-            else if (upperCmd === "15" || upperCmd === "15M") startTimer(15);
-            else if (upperCmd === "20" || upperCmd === "20M") startTimer(20);
-            
-            // Actions
-            else if (upperCmd === "PAUSE" || upperCmd === "STOP") pauseTimer();
-            else if (upperCmd === "RESUME" || upperCmd === "START") pauseTimer(); // Toggle
-            else if (upperCmd === "RESET") resetTimer();
-            
-            // Overrides
-            else if (upperCmd === "HIDE") toggleTimerVisibility();
-            
-            // Complex Commands
-            else if (upperCmd.startsWith("MSG:")) {
-                const msgText = cmd.substring(4); // Remove 'MSG:'
-                setLowerMessage(msgText);
-            }
-            else if (upperCmd.startsWith("FLASH:")) {
-                const flashText = cmd.substring(6);
-                showFlashMessage(flashText);
+                document.getElementById('timer-text').innerText = timeStr;
+                
+                // Update background color based on ESP32 decision
+                document.body.className = colorStr; 
             }
         }
 
+        // --- SEND COMMANDS TO ESP32 ---
+        async function sendCommand(cmd) {
+            if (!bleCharacteristic) return;
+            const encoder = new TextEncoder();
+            await bleCharacteristic.writeValue(encoder.encode(cmd));
+        }
+
+        async function sendTime(minutes) {
+            const seconds = minutes * 60;
+            await sendCommand("SET:" + seconds);
+        }
+
+        async function sendConfig() {
+            const amber = parseInt(document.getElementById('amber-cfg').value) * 60;
+            const red = parseInt(document.getElementById('red-cfg').value) * 60;
+            // Format: CFG:amberSec,redSec
+            await sendCommand(`CFG:${amber},${red}`);
+        }
+
+        function toggleControls() {
+            document.getElementById('controls').classList.toggle('active');
+        }
     </script>
 </body>
 </html>
