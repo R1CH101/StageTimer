@@ -75,14 +75,14 @@
             
             <div class="toggle-row">
                 <span>Show Duration (Sec) (0=Forever)</span>
-                <input type="number" id="msg-dur" value="0" style="width:60px; text-align:center">
+                <input type="number" id="msg-dur" value="30" style="width:60px; text-align:center">
             </div>
             <div class="toggle-row">
                 <span>Full Screen</span>
                 <input type="checkbox" id="chk-fs">
             </div>
             <div class="toggle-row">
-                <span>Flash Once</span>
+                <span>Flash</span>
                 <input type="checkbox" id="chk-fl">
             </div>
 
@@ -181,13 +181,32 @@
             const dec = new TextDecoder();
             const raw = dec.decode(e.target.value); 
             const p = raw.split('|');
-            if(p.length >= 3) {
+            // Packet: TIME|BG|TXT|MSG|IS_FS
+            if(p.length >= 5) {
                 document.getElementById('preview-container').style.background = p[1];
-                document.getElementById('p-time').style.color = p[2];
-                document.getElementById('p-time').innerText = p[0];
-                document.getElementById('p-msg').style.color = p[2];
-                document.getElementById('p-msg').innerText = p[3] || "";
                 
+                const timeEl = document.getElementById('p-time');
+                const msgEl = document.getElementById('p-msg');
+                const isFs = (p[4] === "1");
+
+                if (isFs) {
+                    timeEl.style.display = 'none';
+                    msgEl.style.fontSize = "1.5rem";
+                    msgEl.style.fontWeight = "bold";
+                    msgEl.style.height = "auto";
+                } else {
+                    timeEl.style.display = 'block';
+                    timeEl.style.color = p[2];
+                    timeEl.innerText = p[0];
+                    msgEl.style.fontSize = "1.2rem";
+                    msgEl.style.fontWeight = "normal";
+                    msgEl.style.height = "1.5em";
+                }
+
+                msgEl.style.color = p[2];
+                msgEl.innerText = p[3] || "";
+                
+                // Logic
                 let timeParts = p[0].replace('-','').split(':');
                 if(timeParts.length === 2) {
                     let sec = (parseInt(timeParts[0])*60) + parseInt(timeParts[1]);
@@ -241,13 +260,11 @@
             
             if(currentSec <= at && currentSec > rt && !amberTriggered) {
                 const msg = document.getElementById('def-amber-msg').value;
-                // FIX: Send 0 duration (forever)
                 if(msg) sendCmd(`MSG:${msg}|0|0|0`);
                 amberTriggered = true;
             }
             if(currentSec <= rt && !redTriggered) {
                 const msg = document.getElementById('def-red-msg').value;
-                // FIX: Send 0 duration (forever)
                 if(msg) sendCmd(`MSG:${msg}|0|0|0`);
                 redTriggered = true;
             }
