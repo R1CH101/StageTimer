@@ -8,7 +8,6 @@
         :root { --bg: #121212; --panel: #1e1e1e; --text: #fff; --accent: #3b82f6; --danger: #ef4444; --warn: #eab308; --success: #22c55e; }
         body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; padding-bottom: 50px;}
         
-        /* HEADER & PREVIEW */
         #preview-container { 
             width: 100%; height: 180px; background: #000; 
             display: flex; flex-direction:column; align-items: center; justify-content: center;
@@ -20,7 +19,6 @@
         .status-bar { font-size: 0.8rem; color: #666; width:100%; text-align:center; background:#111; padding:5px 0;}
         .status-bar.off { color: var(--danger); font-weight: bold; background: #300; }
 
-        /* CONTROLS */
         .container { padding: 15px; display: flex; flex-direction: column; gap: 15px; }
         .panel { background: var(--panel); border-radius: 12px; padding: 15px; }
         h3 { margin: 0 0 10px 0; color: #888; font-size: 0.9rem; text-transform: uppercase; }
@@ -51,7 +49,6 @@
     <button onclick="connectBLE()" id="btn-conn" class="btn-blue" style="border-radius:0">CONNECT</button>
 
     <div class="container">
-
         <div class="panel">
             <h3>Set Time</h3>
             <div class="row">
@@ -78,14 +75,14 @@
             
             <div class="toggle-row">
                 <span>Show Duration (Sec) (0=Forever)</span>
-                <input type="number" id="msg-dur" value="10" style="width:60px; text-align:center">
+                <input type="number" id="msg-dur" value="0" style="width:60px; text-align:center">
             </div>
             <div class="toggle-row">
                 <span>Full Screen</span>
                 <input type="checkbox" id="chk-fs">
             </div>
             <div class="toggle-row">
-                <span>Flash (Red/Green)</span>
+                <span>Flash Once</span>
                 <input type="checkbox" id="chk-fl">
             </div>
 
@@ -118,7 +115,6 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     <script>
@@ -132,7 +128,6 @@
         let amberTriggered = false;
         let redTriggered = false;
 
-        // Load Defaults
         if(localStorage.getItem('cfg')) {
             const c = JSON.parse(localStorage.getItem('cfg'));
             document.getElementById('def-amber-t').value = c.at;
@@ -157,30 +152,24 @@
                 bluetoothDevice = await navigator.bluetooth.requestDevice({ 
                     filters: [{ services: [SERVICE_UUID] }] 
                 });
-
-                // Attach Disconnect Listener Immediately
                 bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnect);
-
                 const server = await bluetoothDevice.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 char = await service.getCharacteristic(CHAR_UUID);
                 await char.startNotifications();
                 char.addEventListener('characteristicvaluechanged', onData);
                 
-                // UI Update
                 document.getElementById('status').innerText = "Connected";
                 document.getElementById('status').classList.remove('off');
                 document.getElementById('status').style.color = "#22c55e";
                 document.getElementById('btn-conn').style.display = 'none';
                 syncCfg();
 
-            } catch(e) { 
-                alert("Connection failed: " + e); 
-            }
+            } catch(e) { alert("Connection failed: " + e); }
         }
 
         function onDisconnect() {
-            document.getElementById('status').innerText = "DISCONNECTED - CHECK DEVICE";
+            document.getElementById('status').innerText = "DISCONNECTED";
             document.getElementById('status').classList.add('off');
             document.getElementById('btn-conn').style.display = 'block';
             document.getElementById('preview-container').style.background = "#000";
@@ -212,27 +201,16 @@
         async function sendCmd(c) {
             if(!char) return;
             try {
-                // Encode and Send
                 const enc = new TextEncoder().encode(c);
                 await char.writeValue(enc);
-                
-                // If this is a control command, reset state triggers
                 if(c === "RESET" || c.startsWith("SET")) {
                     amberTriggered = false; redTriggered = false; isRunning = false;
                 }
                 if(c === "START") isRunning = true;
-            } catch(e) { 
-                console.log("Send Error: " + e);
-                // If send fails, device likely disconnected
-                if(!bluetoothDevice.gatt.connected) onDisconnect();
-            }
+            } catch(e) { console.log("Send Error"); }
         }
 
-        function setPreset(min) {
-            sendCmd(`SET:${min*60}`);
-            sendCmd("CLR");
-        }
-
+        function setPreset(min) { sendCmd(`SET:${min*60}`); sendCmd("CLR"); }
         function setCustom() {
             const m = parseInt(document.getElementById('cust-min').value) || 0;
             const s = parseInt(document.getElementById('cust-sec').value) || 0;
@@ -263,16 +241,17 @@
             
             if(currentSec <= at && currentSec > rt && !amberTriggered) {
                 const msg = document.getElementById('def-amber-msg').value;
-                if(msg) sendCmd(`MSG:${msg}|10|0|0`);
+                // FIX: Send 0 duration (forever)
+                if(msg) sendCmd(`MSG:${msg}|0|0|0`);
                 amberTriggered = true;
             }
             if(currentSec <= rt && !redTriggered) {
                 const msg = document.getElementById('def-red-msg').value;
-                if(msg) sendCmd(`MSG:${msg}|10|0|0`);
+                // FIX: Send 0 duration (forever)
+                if(msg) sendCmd(`MSG:${msg}|0|0|0`);
                 redTriggered = true;
             }
         }
-
     </script>
 </body>
 </html>
