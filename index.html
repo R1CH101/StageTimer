@@ -18,6 +18,7 @@
         #p-msg { font-size: 1.2rem; margin-top: 5px; text-align: center; height: 1.5em; overflow:hidden;}
         
         .status-bar { font-size: 0.8rem; color: #666; width:100%; text-align:center; background:#111; padding:5px 0;}
+        .status-bar.off { color: var(--danger); font-weight: bold; background: #300; }
 
         /* CONTROLS */
         .container { padding: 15px; display: flex; flex-direction: column; gap: 15px; }
@@ -46,7 +47,7 @@
         <div id="p-time">--:--</div>
         <div id="p-msg"></div>
     </div>
-    <div class="status-bar" id="status">Disconnected</div>
+    <div class="status-bar" id="status">Tap Connect below</div>
     <button onclick="connectBLE()" id="btn-conn" class="btn-blue" style="border-radius:0">CONNECT</button>
 
     <div class="container">
@@ -123,9 +124,11 @@
     <script>
         const SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
         const CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
+        let bluetoothDevice;
         let char;
-        let isRunning = false;
+        
         let currentSec = 0;
+        let isRunning = false;
         let amberTriggered = false;
         let redTriggered = false;
 
@@ -151,23 +154,43 @@
 
         async function connectBLE() {
             try {
-                const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
-                const server = await dev.gatt.connect();
+                bluetoothDevice = await navigator.bluetooth.requestDevice({ 
+                    filters: [{ services: [SERVICE_UUID] }] 
+                });
+
+                // Attach Disconnect Listener Immediately
+                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnect);
+
+                const server = await bluetoothDevice.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 char = await service.getCharacteristic(CHAR_UUID);
                 await char.startNotifications();
                 char.addEventListener('characteristicvaluechanged', onData);
                 
+                // UI Update
                 document.getElementById('status').innerText = "Connected";
+                document.getElementById('status').classList.remove('off');
                 document.getElementById('status').style.color = "#22c55e";
                 document.getElementById('btn-conn').style.display = 'none';
                 syncCfg();
-            } catch(e) { alert(e); }
+
+            } catch(e) { 
+                alert("Connection failed: " + e); 
+            }
+        }
+
+        function onDisconnect() {
+            document.getElementById('status').innerText = "DISCONNECTED - CHECK DEVICE";
+            document.getElementById('status').classList.add('off');
+            document.getElementById('btn-conn').style.display = 'block';
+            document.getElementById('preview-container').style.background = "#000";
+            document.getElementById('p-time').innerText = "--:--";
+            char = null;
         }
 
         function onData(e) {
             const dec = new TextDecoder();
-            const raw = dec.decode(e.target.value); // "TIME|#BG|#TXT|MSG"
+            const raw = dec.decode(e.target.value); 
             const p = raw.split('|');
             if(p.length >= 3) {
                 document.getElementById('preview-container').style.background = p[1];
@@ -176,7 +199,6 @@
                 document.getElementById('p-msg').style.color = p[2];
                 document.getElementById('p-msg').innerText = p[3] || "";
                 
-                // Logic for auto-alerts
                 let timeParts = p[0].replace('-','').split(':');
                 if(timeParts.length === 2) {
                     let sec = (parseInt(timeParts[0])*60) + parseInt(timeParts[1]);
@@ -190,17 +212,20 @@
         async function sendCmd(c) {
             if(!char) return;
             try {
-                // Burst send to ensure delivery (Reliability Fix)
+                // Encode and Send
                 const enc = new TextEncoder().encode(c);
                 await char.writeValue(enc);
-                // Tiny delays to prevent stack flooding
-                setTimeout(() => char.writeValue(enc), 50); 
                 
+                // If this is a control command, reset state triggers
                 if(c === "RESET" || c.startsWith("SET")) {
                     amberTriggered = false; redTriggered = false; isRunning = false;
                 }
                 if(c === "START") isRunning = true;
-            } catch(e) { console.log("Send retry..."); }
+            } catch(e) { 
+                console.log("Send Error: " + e);
+                // If send fails, device likely disconnected
+                if(!bluetoothDevice.gatt.connected) onDisconnect();
+            }
         }
 
         function setPreset(min) {
