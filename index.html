@@ -206,7 +206,6 @@
                 msgEl.style.color = p[2];
                 msgEl.innerText = p[3] || "";
                 
-                // Logic
                 let timeParts = p[0].replace('-','').split(':');
                 if(timeParts.length === 2) {
                     let sec = (parseInt(timeParts[0])*60) + parseInt(timeParts[1]);
@@ -253,8 +252,8 @@
 
         function checkAutoAlerts(currentMsgOnScreen) {
             if(!isRunning) return;
-            if(currentMsgOnScreen && currentMsgOnScreen.length > 0) return;
-
+            // FIXED: Removed the check that prevented overwriting existing messages
+            
             const at = document.getElementById('def-amber-t').value * 60;
             const rt = document.getElementById('def-red-t').value * 60;
             
