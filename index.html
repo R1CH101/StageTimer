@@ -38,10 +38,20 @@
         .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;}
         input[type="checkbox"] { width: 24px; height: 24px; }
         
-        /* Count Up Toggle Style */
         .mode-toggle { display:flex; justify-content:center; gap:20px; background:#000; padding:10px; border-radius:8px; margin-bottom:15px; }
         .mode-opt { color:#666; font-weight:bold; cursor:pointer; }
         .mode-opt.active { color:var(--accent); text-decoration: underline; }
+
+        /* Color Picker */
+        .color-row { display:flex; gap:5px; margin-top:10px; }
+        .c-btn { flex:1; height:40px; border-radius:6px; border:2px solid #333; cursor:pointer; opacity:0.6; }
+        .c-btn.selected { border-color:white; opacity:1; box-shadow:0 0 5px white; }
+        .bg-auto { background: #333; text-align:center; line-height:36px; font-size:0.8rem; color:#aaa; }
+        .bg-grn { background: var(--success); }
+        .bg-amb { background: var(--warn); }
+        .bg-red { background: var(--danger); }
+        .bg-blk { background: #000; }
+
     </style>
 </head>
 <body>
@@ -54,7 +64,6 @@
     <button onclick="connectBLE()" id="btn-conn" class="btn-blue" style="border-radius:0">CONNECT</button>
 
     <div class="container">
-        
         <div class="mode-toggle">
             <div id="mode-dn" class="mode-opt active" onclick="setMode(0)">COUNT DOWN</div>
             <div id="mode-up" class="mode-opt" onclick="setMode(1)">COUNT UP</div>
@@ -74,7 +83,7 @@
                 <button onclick="setPreset(20)">20m</button>
             </div>
             <div class="row" style="margin-top:15px">
-                <button class="btn-green" onclick="sendCmd('START')">START</button>
+                <button class="btn-green" onclick="sendCmd('START'); syncCfg();">START</button>
                 <button class="btn-red" onclick="sendCmd('STOP')">STOP</button>
                 <button class="btn-warn" onclick="sendCmd('RESET')">RESET</button>
             </div>
@@ -84,8 +93,16 @@
             <h3>Message Center</h3>
             <input type="text" id="msg-text" maxlength="120" placeholder="Enter message (Max 120)" style="font-size:1.1rem; margin-bottom:15px">
             
-            <div class="toggle-row">
-                <span>Show Duration (Sec) (0=Forever)</span>
+            <div class="color-row">
+                <div class="c-btn bg-auto selected" onclick="setMsgColor(-1, this)">Auto</div>
+                <div class="c-btn bg-grn" onclick="setMsgColor(0, this)"></div>
+                <div class="c-btn bg-amb" onclick="setMsgColor(1, this)"></div>
+                <div class="c-btn bg-red" onclick="setMsgColor(2, this)"></div>
+                <div class="c-btn bg-blk" onclick="setMsgColor(3, this)"></div>
+            </div>
+
+            <div class="toggle-row" style="margin-top:15px;">
+                <span>Show Duration (Sec)</span>
                 <input type="number" id="msg-dur" value="30" style="width:60px; text-align:center">
             </div>
             <div class="toggle-row">
@@ -138,12 +155,19 @@
         let isRunning = false;
         let amberTriggered = false;
         let redTriggered = false;
-        let isCountUp = 0; // 0 = Down, 1 = Up
+        let isCountUp = 0;
+        let selectedMsgColor = -1;
 
         function setMode(m) {
             isCountUp = m;
             document.getElementById('mode-dn').className = m === 0 ? "mode-opt active" : "mode-opt";
             document.getElementById('mode-up').className = m === 1 ? "mode-opt active" : "mode-opt";
+        }
+
+        function setMsgColor(c, el) {
+            selectedMsgColor = c;
+            document.querySelectorAll('.c-btn').forEach(b => b.classList.remove('selected'));
+            el.classList.add('selected');
         }
 
         if(localStorage.getItem('cfg')) {
@@ -167,7 +191,9 @@
 
         async function connectBLE() {
             try {
-                bluetoothDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
+                bluetoothDevice = await navigator.bluetooth.requestDevice({ 
+                    filters: [{ services: [SERVICE_UUID] }] 
+                });
                 bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnect);
                 const server = await bluetoothDevice.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
@@ -244,11 +270,7 @@
             } catch(e) { console.log("Send Error"); }
         }
 
-        function setPreset(min) { 
-            // SEND TIME AND MODE
-            sendCmd(`SET:${min*60}|${isCountUp}`); 
-            sendCmd("CLR"); 
-        }
+        function setPreset(min) { sendCmd(`SET:${min*60}|${isCountUp}`); sendCmd("CLR"); }
         function setCustom() {
             const m = parseInt(document.getElementById('cust-min').value) || 0;
             const s = parseInt(document.getElementById('cust-sec').value) || 0;
@@ -261,7 +283,8 @@
             const dur = document.getElementById('msg-dur').value;
             const fs = document.getElementById('chk-fs').checked ? "1" : "0";
             const fl = document.getElementById('chk-fl').checked ? "1" : "0";
-            sendCmd(`MSG:${txt}|${dur}|${fs}|${fl}`);
+            // ADDED: Color Param
+            sendCmd(`MSG:${txt}|${dur}|${fs}|${fl}|${selectedMsgColor}`);
         }
 
         function syncCfg() {
@@ -276,44 +299,15 @@
             const at = document.getElementById('def-amber-t').value * 60;
             const rt = document.getElementById('def-red-t').value * 60;
             
-            // Logic for Down vs Up is handled by ESP32 visual state, 
-            // but we need to trigger the message sending here.
-            
-            // NOTE: ESP32 sends current seconds. 
-            // In Down Mode: 300 -> 0.
-            // In Up Mode: 0 -> 300.
-            
-            // Logic must adapt to mode
-            let triggerAmber = false;
-            let triggerRed = false;
-            
-            // To simplify: We actually don't know the Total Time in JS easily without storing it.
-            // But we know standard behavior:
-            // Down: Amber at X remaining.
-            // Up: Amber at X remaining (Total - Current <= AmberThreshold) is hard without Total.
-            
-            // SIMPLIFIED APPROACH:
-            // The ESP32 handles the COLOR changes. 
-            // The JS handles the TEXT messages.
-            // JS needs to know when to send text.
-            
-            // Re-implementing logic is tricky without state sync.
-            // Better to just check specific values if possible, or assume Standard Down for now.
-            // Since User primarily uses Down for speeches, Up is usually stopwatch.
-            
-            // For now, let's keep logic for DOWN mode active, 
-            // Up mode auto-text might need complex sync not present here.
-            if(isCountUp === 0) {
-                 if(currentSec <= at && currentSec > rt && !amberTriggered) {
-                    const msg = document.getElementById('def-amber-msg').value;
-                    if(msg) sendCmd(`MSG:${msg}|0|0|0`);
-                    amberTriggered = true;
-                }
-                if(currentSec <= rt && !redTriggered) {
-                    const msg = document.getElementById('def-red-msg').value;
-                    if(msg) sendCmd(`MSG:${msg}|0|0|0`);
-                    redTriggered = true;
-                }
+            if(currentSec <= at && currentSec > rt && !amberTriggered) {
+                const msg = document.getElementById('def-amber-msg').value;
+                if(msg) sendCmd(`MSG:${msg}|0|0|0|-1`);
+                amberTriggered = true;
+            }
+            if(currentSec <= rt && !redTriggered) {
+                const msg = document.getElementById('def-red-msg').value;
+                if(msg) sendCmd(`MSG:${msg}|0|0|0|-1`);
+                redTriggered = true;
             }
         }
     </script>
