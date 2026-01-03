@@ -42,7 +42,6 @@
         .mode-opt { color:#666; font-weight:bold; cursor:pointer; }
         .mode-opt.active { color:var(--accent); text-decoration: underline; }
 
-        /* Color Picker Hidden by Default */
         .color-row { display:none; gap:5px; margin-top:10px; }
         .c-btn { flex:1; height:40px; border-radius:6px; border:2px solid #333; cursor:pointer; opacity:0.6; }
         .c-btn.selected { border-color:white; opacity:1; box-shadow:0 0 5px white; }
@@ -51,6 +50,13 @@
         .bg-amb { background: var(--warn); }
         .bg-red { background: var(--danger); }
         .bg-blk { background: #000; }
+
+        /* Safe Color Toggle */
+        .safe-toggle { display:flex; gap:10px; margin-bottom:10px; }
+        .safe-opt { flex:1; padding:8px; text-align:center; background:#333; cursor:pointer; border-radius:4px; font-size:0.9rem; }
+        .safe-opt.selected { border:1px solid #fff; font-weight:bold; }
+        .safe-grn.selected { background: var(--success); color:#000; }
+        .safe-blk.selected { background: #000; color:#fff; }
 
     </style>
 </head>
@@ -64,6 +70,15 @@
     <button onclick="connectBLE()" id="btn-conn" class="btn-blue" style="border-radius:0">CONNECT</button>
 
     <div class="container">
+        
+        <div class="panel">
+            <h3>Initial / Safe Color</h3>
+            <div class="safe-toggle">
+                <div id="safe-grn" class="safe-opt safe-grn selected" onclick="setSafeColor(0)">GREEN</div>
+                <div id="safe-blk" class="safe-opt safe-blk" onclick="setSafeColor(1)">BLACK</div>
+            </div>
+        </div>
+
         <div class="mode-toggle">
             <div id="mode-dn" class="mode-opt active" onclick="setMode(0)">COUNT DOWN</div>
             <div id="mode-up" class="mode-opt" onclick="setMode(1)">COUNT UP</div>
@@ -93,7 +108,7 @@
             <h3>Message Center</h3>
             <input type="text" id="msg-text" maxlength="120" placeholder="Enter message (Max 120)" style="font-size:1.1rem; margin-bottom:15px">
             
-            <div class="toggle-row" style="margin-top:15px;">
+            <div class="toggle-row">
                 <span>Show Duration (Sec)</span>
                 <input type="number" id="msg-dur" value="30" style="width:60px; text-align:center">
             </div>
@@ -153,23 +168,31 @@
         let char;
         
         let currentSec = 0;
-        let totalSec = 0; // Tracks target
+        let totalSec = 0; 
         let isRunning = false;
         let amberTriggered = false;
         let redTriggered = false;
         let isCountUp = 0;
         let selectedMsgColor = -1;
+        let safeColorMode = 0; // 0=Green, 1=Black
 
-        // Restore Mode from Memory
-        if(localStorage.getItem('mode')) {
-            setMode(parseInt(localStorage.getItem('mode')));
-        }
+        // Init
+        if(localStorage.getItem('mode')) setMode(parseInt(localStorage.getItem('mode')));
+        if(localStorage.getItem('safe')) setSafeColor(parseInt(localStorage.getItem('safe')));
 
         function setMode(m) {
             isCountUp = m;
             document.getElementById('mode-dn').className = m === 0 ? "mode-opt active" : "mode-opt";
             document.getElementById('mode-up').className = m === 1 ? "mode-opt active" : "mode-opt";
             localStorage.setItem('mode', m);
+        }
+
+        function setSafeColor(c) {
+            safeColorMode = c;
+            document.getElementById('safe-grn').className = c === 0 ? "safe-opt safe-grn selected" : "safe-opt safe-grn";
+            document.getElementById('safe-blk').className = c === 1 ? "safe-opt safe-blk selected" : "safe-opt safe-blk";
+            localStorage.setItem('safe', c);
+            sendCmd(`SAFE:${c}`);
         }
 
         function toggleColorRow() {
@@ -204,9 +227,7 @@
 
         async function connectBLE() {
             try {
-                bluetoothDevice = await navigator.bluetooth.requestDevice({ 
-                    filters: [{ services: [SERVICE_UUID] }] 
-                });
+                bluetoothDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
                 bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnect);
                 const server = await bluetoothDevice.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
@@ -218,7 +239,10 @@
                 document.getElementById('status').classList.remove('off');
                 document.getElementById('status').style.color = "#22c55e";
                 document.getElementById('btn-conn').style.display = 'none';
+                
+                // Sync Initial State
                 syncCfg();
+                sendCmd(`SAFE:${safeColorMode}`);
 
             } catch(e) { alert("Connection failed: " + e); }
         }
@@ -236,6 +260,7 @@
             const dec = new TextDecoder();
             const raw = dec.decode(e.target.value); 
             const p = raw.split('|');
+            // Packet: TIME|BG|TXT|MSG|IS_FS
             if(p.length >= 5) {
                 document.getElementById('preview-container').style.background = p[1];
                 const timeEl = document.getElementById('p-time');
@@ -299,10 +324,9 @@
             const dur = document.getElementById('msg-dur').value;
             const fs = document.getElementById('chk-fs').checked ? "1" : "0";
             const fl = document.getElementById('chk-fl').checked ? "1" : "0";
-            // Use configured color only if Full Screen
+            // Send Color ID if FS checked
             let col = -1;
             if(document.getElementById('chk-fs').checked) col = selectedMsgColor;
-            
             sendCmd(`MSG:${txt}|${dur}|${fs}|${fl}|${col}`);
         }
 
@@ -312,26 +336,18 @@
             sendCmd(`CFG:${at},${rt}`);
         }
 
-        // --- NEW UNIFIED WARNING LOGIC ---
         function checkAutoAlerts(currentMsgOnScreen) {
             if(!isRunning) return;
             
-            const at = document.getElementById('def-amber-t').value * 60; // e.g., 120s
-            const rt = document.getElementById('def-red-t').value * 60;   // e.g., 0s
+            const at = document.getElementById('def-amber-t').value * 60; 
+            const rt = document.getElementById('def-red-t').value * 60;   
             
-            // Calculate "Seconds Remaining" based on mode
+            // Calc Remaining Seconds
             let remaining = 0;
-            
-            if(isCountUp === 1) {
-                // In Up mode: Target - Current = Remaining
-                // E.g. Target 300, Current 200 = 100 left
-                remaining = totalSec - currentSec;
-            } else {
-                // In Down mode: Current is remaining
-                remaining = currentSec;
-            }
+            if(isCountUp === 1) remaining = totalSec - currentSec;
+            else remaining = currentSec;
 
-            // AMBER CHECK (e.g. 2 mins left)
+            // AMBER
             if (remaining <= at && remaining > rt) {
                 if(!amberTriggered) {
                     const msg = document.getElementById('def-amber-msg').value;
@@ -339,7 +355,7 @@
                     amberTriggered = true;
                 }
             } 
-            // RED CHECK (e.g. 0 mins left or negative)
+            // RED
             else if (remaining <= rt) {
                 if(!redTriggered) {
                     const msg = document.getElementById('def-red-msg').value;
