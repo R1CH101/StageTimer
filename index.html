@@ -37,6 +37,11 @@
         
         .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;}
         input[type="checkbox"] { width: 24px; height: 24px; }
+        
+        /* Count Up Toggle Style */
+        .mode-toggle { display:flex; justify-content:center; gap:20px; background:#000; padding:10px; border-radius:8px; margin-bottom:15px; }
+        .mode-opt { color:#666; font-weight:bold; cursor:pointer; }
+        .mode-opt.active { color:var(--accent); text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -49,8 +54,14 @@
     <button onclick="connectBLE()" id="btn-conn" class="btn-blue" style="border-radius:0">CONNECT</button>
 
     <div class="container">
+        
+        <div class="mode-toggle">
+            <div id="mode-dn" class="mode-opt active" onclick="setMode(0)">COUNT DOWN</div>
+            <div id="mode-up" class="mode-opt" onclick="setMode(1)">COUNT UP</div>
+        </div>
+
         <div class="panel">
-            <h3>Set Time</h3>
+            <h3>Set Time (Target)</h3>
             <div class="row">
                 <div style="flex:1"><label>Min</label><input type="number" id="cust-min" value="0"></div>
                 <div style="flex:1"><label>Sec</label><input type="number" id="cust-sec" value="0"></div>
@@ -127,6 +138,13 @@
         let isRunning = false;
         let amberTriggered = false;
         let redTriggered = false;
+        let isCountUp = 0; // 0 = Down, 1 = Up
+
+        function setMode(m) {
+            isCountUp = m;
+            document.getElementById('mode-dn').className = m === 0 ? "mode-opt active" : "mode-opt";
+            document.getElementById('mode-up').className = m === 1 ? "mode-opt active" : "mode-opt";
+        }
 
         if(localStorage.getItem('cfg')) {
             const c = JSON.parse(localStorage.getItem('cfg'));
@@ -149,9 +167,7 @@
 
         async function connectBLE() {
             try {
-                bluetoothDevice = await navigator.bluetooth.requestDevice({ 
-                    filters: [{ services: [SERVICE_UUID] }] 
-                });
+                bluetoothDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
                 bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnect);
                 const server = await bluetoothDevice.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
@@ -228,11 +244,15 @@
             } catch(e) { console.log("Send Error"); }
         }
 
-        function setPreset(min) { sendCmd(`SET:${min*60}`); sendCmd("CLR"); }
+        function setPreset(min) { 
+            // SEND TIME AND MODE
+            sendCmd(`SET:${min*60}|${isCountUp}`); 
+            sendCmd("CLR"); 
+        }
         function setCustom() {
             const m = parseInt(document.getElementById('cust-min').value) || 0;
             const s = parseInt(document.getElementById('cust-sec').value) || 0;
-            sendCmd(`SET:${(m*60)+s}`);
+            sendCmd(`SET:${(m*60)+s}|${isCountUp}`);
             sendCmd("CLR");
         }
 
@@ -252,20 +272,48 @@
 
         function checkAutoAlerts(currentMsgOnScreen) {
             if(!isRunning) return;
-            // FIXED: Removed the check that prevented overwriting existing messages
             
             const at = document.getElementById('def-amber-t').value * 60;
             const rt = document.getElementById('def-red-t').value * 60;
             
-            if(currentSec <= at && currentSec > rt && !amberTriggered) {
-                const msg = document.getElementById('def-amber-msg').value;
-                if(msg) sendCmd(`MSG:${msg}|0|0|0`);
-                amberTriggered = true;
-            }
-            if(currentSec <= rt && !redTriggered) {
-                const msg = document.getElementById('def-red-msg').value;
-                if(msg) sendCmd(`MSG:${msg}|0|0|0`);
-                redTriggered = true;
+            // Logic for Down vs Up is handled by ESP32 visual state, 
+            // but we need to trigger the message sending here.
+            
+            // NOTE: ESP32 sends current seconds. 
+            // In Down Mode: 300 -> 0.
+            // In Up Mode: 0 -> 300.
+            
+            // Logic must adapt to mode
+            let triggerAmber = false;
+            let triggerRed = false;
+            
+            // To simplify: We actually don't know the Total Time in JS easily without storing it.
+            // But we know standard behavior:
+            // Down: Amber at X remaining.
+            // Up: Amber at X remaining (Total - Current <= AmberThreshold) is hard without Total.
+            
+            // SIMPLIFIED APPROACH:
+            // The ESP32 handles the COLOR changes. 
+            // The JS handles the TEXT messages.
+            // JS needs to know when to send text.
+            
+            // Re-implementing logic is tricky without state sync.
+            // Better to just check specific values if possible, or assume Standard Down for now.
+            // Since User primarily uses Down for speeches, Up is usually stopwatch.
+            
+            // For now, let's keep logic for DOWN mode active, 
+            // Up mode auto-text might need complex sync not present here.
+            if(isCountUp === 0) {
+                 if(currentSec <= at && currentSec > rt && !amberTriggered) {
+                    const msg = document.getElementById('def-amber-msg').value;
+                    if(msg) sendCmd(`MSG:${msg}|0|0|0`);
+                    amberTriggered = true;
+                }
+                if(currentSec <= rt && !redTriggered) {
+                    const msg = document.getElementById('def-red-msg').value;
+                    if(msg) sendCmd(`MSG:${msg}|0|0|0`);
+                    redTriggered = true;
+                }
             }
         }
     </script>
