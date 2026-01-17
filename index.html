@@ -124,12 +124,18 @@
 
         <div class="panel">
             <h3>Device Settings</h3>
-            <div class="toggle-row">
-                <span>Brightness</span>
+            <div class="row">
+                <div style="flex:1"><button onclick="setBrightPreset('LOW')">LOW</button></div>
+                <div style="flex:1"><button onclick="setBrightPreset('MID')">MID</button></div>
+                <div style="flex:1"><button onclick="setBrightPreset('MAX')">MAX</button></div>
+            </div>
+            <div class="toggle-row" style="margin-top:10px">
+                <span>Custom Brightness</span>
                 <input type="range" id="bright-slider" min="0" max="255" value="255" style="width:150px" oninput="setBrightness(this.value)">
             </div>
-            <div class="row">
+            <div class="row" style="margin-top:10px">
                 <button class="btn-blue" onclick="syncCfg()">SYNC ALERT CONFIG</button>
+                <button style="background:#444" onclick="reconnectBLE()">RECONNECT</button>
             </div>
         </div>
 
@@ -318,6 +324,21 @@
 
         function setBrightness(v) {
             sendCmd(`BRIGHT:${v}`);
+        }
+
+        function setBrightPreset(p) {
+            sendCmd(`BRIGHT:${p}`);
+            // reflect on slider
+            if (p === 'LOW') document.getElementById('bright-slider').value = 64;
+            else if (p === 'MID') document.getElementById('bright-slider').value = 128;
+            else document.getElementById('bright-slider').value = 255;
+        }
+
+        function reconnectBLE() {
+            if (bluetoothDevice && bluetoothDevice.gatt && bluetoothDevice.gatt.connected) {
+                bluetoothDevice.gatt.disconnect();
+            }
+            connectBLE();
         }
 
         function syncCfg() {
