@@ -15,7 +15,7 @@
         /* Device-mock preview to resemble the real display (aspect ratio, font, scrolling) */
         .device-mock { width: 100%; max-width:420px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; padding:0; box-sizing:border-box; }
         /* Timer should match device: large, centered, ~70% width */
-        #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: clamp(64px, 20vw, 220px); font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; max-width:70%; width:70%; text-align:center; display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; font-variant-numeric: tabular-nums; -webkit-font-feature-settings: "tnum" 1; font-feature-settings: "tnum" 1; letter-spacing: -0.02em; }
+        #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: clamp(64px, 20vw, 220px); font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; text-align:center; display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; font-variant-numeric: tabular-nums; -webkit-font-feature-settings: "tnum" 1; font-feature-settings: "tnum" 1; letter-spacing: -0.02em; }
         /* Messages match device size and sit at the bottom centered */
         #p-msg { position:absolute; bottom:8%; left:0; width:100%; display:flex; justify-content:center; align-items:center; font-family: 'Poppins', system-ui, sans-serif; font-size: 24px; text-align: center; overflow:hidden; white-space:nowrap; }
         /* Scrolling inner span */
@@ -223,14 +223,17 @@
         let redTriggered = false;
         let selectedMsgColor = -1;
 
-        // Fit the timer text so it occupies ~70% of the preview width.
+        // Fit the timer text so it occupies most of the preview width (≈92%).
         function fitTimerToWidth() {
             if (!pTimeEl || !deviceMock) return;
-            const avail = deviceMock.clientWidth * 0.7; // target width
+            const avail = deviceMock.clientWidth * 0.92; // target width (~92%)
             const text = pTimeEl.innerText || '--:--';
             // binary search for best font-size
-            let lo = 10, hi = 400, best = lo;
+            let lo = 8, hi = 800, best = lo;
             const measEl = pTimeEl;
+            // ensure monospace-like measurement: remove padding while measuring
+            const prevPadding = measEl.style.padding;
+            measEl.style.padding = '0';
             while (lo <= hi) {
                 const mid = Math.floor((lo + hi) / 2);
                 measEl.style.fontSize = mid + 'px';
@@ -240,6 +243,7 @@
                 else { hi = mid - 1; }
             }
             measEl.style.fontSize = best + 'px';
+            measEl.style.padding = prevPadding;
         }
 
         window.addEventListener('resize', () => { fitTimerToWidth(); });
