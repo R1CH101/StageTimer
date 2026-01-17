@@ -13,11 +13,11 @@
         /* Preview */
         #preview-container { width: 100%; height: 160px; background: #000; display: flex; flex-direction:column; align-items: center; justify-content: center; border-bottom: 2px solid #333; position: sticky; top:0; z-index:10; }
         /* Device-mock preview to resemble the real display (aspect ratio, font, scrolling) */
-        .device-mock { width: 100%; max-width:420px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; padding:0; box-sizing:border-box; }
+        .device-mock { width: 100%; max-width:420px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; padding:0; box-sizing:border-box; max-height:30vh; }
         /* Timer should match device: large, centered, ~70% width */
         #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: clamp(64px, 20vw, 220px); font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; text-align:center; display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; font-variant-numeric: tabular-nums; -webkit-font-feature-settings: "tnum" 1; font-feature-settings: "tnum" 1; letter-spacing: -0.02em; }
         /* Messages match device size and sit at the bottom centered */
-        #p-msg { position:absolute; bottom:8%; left:0; width:100%; display:flex; justify-content:center; align-items:center; font-family: 'Poppins', system-ui, sans-serif; font-size: 24px; text-align: center; overflow:hidden; white-space:nowrap; }
+        #p-msg { position:absolute; bottom:8%; left:0; width:100%; display:flex; justify-content:center; align-items:center; font-family: 'Poppins', system-ui, sans-serif; font-size: 48px; text-align: center; overflow:hidden; white-space:nowrap; }
         /* Scrolling inner span */
         #p-msg > span { display: inline-block; white-space:nowrap; }
         .timer-bar { position:absolute; left:0; right:0; bottom:0; height:3%; background: rgba(255,255,255,0.04); }
@@ -226,7 +226,7 @@
         // Fit the timer text so it occupies most of the preview width (≈92%).
         function fitTimerToWidth() {
             if (!pTimeEl || !deviceMock) return;
-            const avail = deviceMock.clientWidth * 0.92; // target width (~92%)
+            const avail = deviceMock.clientWidth * 0.7; // target width (~70%)
             const text = pTimeEl.innerText || '--:--';
             // binary search for best font-size
             let lo = 8, hi = 800, best = lo;
