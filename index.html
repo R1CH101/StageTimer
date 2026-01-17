@@ -22,6 +22,8 @@
         h3 { margin: 0 0 8px 0; color: #888; font-size: 0.78rem; text-transform: uppercase; }
 
         .row { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; }
+        /* Special rows that must stay horizontal even on narrow screens */
+        .preset-row, .controls-row, .custom-row { flex-direction: row; flex-wrap: nowrap; }
         .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 
         button { border: none; padding: 10px 6px; border-radius: 6px; font-weight: bold; font-size: 0.95rem; cursor: pointer; background: #333; color: white; width:100%; }
@@ -63,7 +65,7 @@
             #p-time { font-size: 2rem; }
             #p-msg { font-size: 0.95rem; }
             .grid-4 { grid-template-columns: repeat(2, 1fr); gap:6px; }
-            .row, .toggle-row { flex-direction: column; gap:6px; align-items: stretch; }
+            .row:not(.preset-row):not(.controls-row):not(.custom-row), .toggle-row { flex-direction: column; gap:6px; align-items: stretch; }
             .row > button, .grid-4 button, button { width: 100%; padding:8px 6px; font-size:0.95rem; }
             .container { padding: 8px; }
             .panel { padding:8px; }
@@ -98,19 +100,21 @@
         <div class="panel">
             <h3>Set Time (Target)</h3>
             <div class="row">
-                <div style="flex:1"><label>Min</label><input type="number" id="cust-min" value="0"></div>
-                <div style="flex:1"><label>Sec</label><input type="number" id="cust-sec" value="0"></div>
+                <div class="row custom-row">
+                    <div style="flex:1"><label>Min</label><input type="number" id="cust-min" value="0"></div>
+                    <div style="flex:1"><label>Sec</label><input type="number" id="cust-sec" value="0"></div>
+                </div>
                     <div class="row" style="margin-top:10px">
                         <button style="background:#444" onclick="reconnectBLE()">RECONNECT</button>
                     </div>
-                    <div class="row" style="margin-top:10px">
+                    <div class="row preset-row" style="margin-top:10px">
                         <button style="flex:1" onclick="setPreset(5)">5m</button>
                         <button style="flex:1" onclick="setPreset(10)">10m</button>
                         <button style="flex:1" onclick="setPreset(15)">15m</button>
                         <button style="flex:1" onclick="setPreset(20)">20m</button>
                     </div>
             </div>
-            <div class="row" style="margin-top:15px">
+            <div class="row controls-row" style="margin-top:15px">
                 <button class="btn-green" style="flex:1" onclick="sendCmd('START')">START</button>
                 <button class="btn-red" style="flex:1" onclick="sendCmd('STOP')">STOP</button>
                 <button class="btn-warn" style="flex:1" onclick="sendCmd('RESET')">RESET</button>
