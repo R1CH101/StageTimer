@@ -133,6 +133,14 @@
                 <span>Custom Brightness</span>
                 <input type="range" id="bright-slider" min="0" max="255" value="255" style="width:150px" oninput="setBrightness(this.value)">
             </div>
+            <div class="toggle-row" style="margin-top:10px">
+                <span id="btn-ddt-label">Direct Draw</span>
+                <button id="btn-ddt" onclick="toggleDDT()">DDT: AUTO</button>
+            </div>
+            <div class="toggle-row">
+                <span>Touch Enabled</span>
+                <input type="checkbox" id="chk-touch" onchange="toggleTouch()">
+            </div>
             <div class="row" style="margin-top:10px">
                 <button class="btn-blue" onclick="syncCfg()">SYNC ALERT CONFIG</button>
                 <button style="background:#444" onclick="reconnectBLE()">RECONNECT</button>
@@ -249,6 +257,15 @@
                 document.getElementById('bright-slider').value = p[4];
                 document.getElementById('def-amber-msg').value = p[5] || "";
                 document.getElementById('def-red-msg').value = p[6] || "";
+                // optional flags: directDrawTimer and touchEnabled
+                if (p.length >= 8) {
+                    const ddt = parseInt(p[7]);
+                    document.getElementById('btn-ddt').innerText = ddt ? 'DDT: ON' : 'DDT: OFF';
+                }
+                if (p.length >= 9) {
+                    const tch = parseInt(p[8]);
+                    document.getElementById('chk-touch').checked = (tch === 1);
+                }
                 return;
             }
 
@@ -339,6 +356,18 @@
                 bluetoothDevice.gatt.disconnect();
             }
             connectBLE();
+        }
+
+        function toggleDDT() {
+            const btn = document.getElementById('btn-ddt');
+            const on = btn.innerText.indexOf('ON') === -1; // flip
+            btn.innerText = on ? 'DDT: ON' : 'DDT: OFF';
+            sendCmd('DDT:' + (on ? '1' : '0'));
+        }
+
+        function toggleTouch() {
+            const chk = document.getElementById('chk-touch');
+            sendCmd('TOUCH:' + (chk.checked ? '1' : '0'));
         }
 
         function syncCfg() {
