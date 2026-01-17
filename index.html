@@ -59,14 +59,29 @@
         .safe-blk.selected { background: #000; color:#fff; }
 
         /* Mobile responsiveness */
-        @media (max-width: 600px) {
-            #preview-container { height: 140px; }
-            #p-time { font-size: 3rem; }
-            #p-msg { font-size: 1rem; }
-            .grid-4 { grid-template-columns: repeat(2, 1fr); }
-            .row, .toggle-row { flex-direction: column; }
-            .row > button, .grid-4 button, button { width: 100%; }
-            .container { padding: 12px; }
+        @media (max-width: 700px) {
+            #preview-container { height: 120px; padding:8px; }
+            #p-time { font-size: 2.4rem; }
+            #p-msg { font-size: 0.95rem; }
+            .grid-4 { grid-template-columns: repeat(2, 1fr); gap:6px; }
+            .row, .toggle-row { flex-direction: column; gap:6px; }
+            .row > button, .grid-4 button, button { width: 100%; padding:10px 8px; font-size:0.95rem; }
+            .container { padding: 10px; }
+            .panel { padding:10px; }
+            h3 { font-size:0.78rem; }
+            input, select { padding:8px; font-size:0.95rem; }
+            .status-bar { font-size:0.75rem; padding:4px 0; }
+            #preview-container { border-bottom-width:2px; }
+        }
+
+        /* Extra compact mode for very small screens */
+        @media (max-width: 400px) {
+            #preview-container { height:100px; }
+            #p-time { font-size:1.9rem; }
+            .grid-4 { grid-template-columns: 1fr; }
+            .row, .toggle-row { gap:4px; }
+            button { padding:8px 6px; font-size:0.9rem; }
+            .panel { padding:8px; }
         }
 
     </style>
