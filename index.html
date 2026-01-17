@@ -76,9 +76,10 @@
             <div class="row">
                 <div style="flex:1"><label>Min</label><input type="number" id="cust-min" value="0"></div>
                 <div style="flex:1"><label>Sec</label><input type="number" id="cust-sec" value="0"></div>
-                <button class="btn-blue" style="flex:1; align-self:flex-end" onclick="setCustom()">SET</button>
-            </div>
-            <div class="grid-4" style="margin-top:10px">
+                    <div class="row" style="margin-top:10px">
+                        <button class="btn-blue" onclick="syncCfg()">SYNC ALERT CONFIG</button>
+                        <button style="background:#444" onclick="reconnectBLE()">RECONNECT</button>
+                    </div>
                 <button onclick="setPreset(5)">5m</button>
                 <button onclick="setPreset(10)">10m</button>
                 <button onclick="setPreset(15)">15m</button>
@@ -125,22 +126,13 @@
         <div class="panel">
             <h3>Device Settings</h3>
             <div class="row">
-                <div style="flex:1"><button onclick="setBrightPreset('LOW')">LOW</button></div>
-                <div style="flex:1"><button onclick="setBrightPreset('MID')">MID</button></div>
-                <div style="flex:1"><button onclick="setBrightPreset('MAX')">MAX</button></div>
-            </div>
-            <div class="toggle-row" style="margin-top:10px">
-                <span>Custom Brightness</span>
-                <input type="range" id="bright-slider" min="0" max="255" value="255" style="width:150px" oninput="setBrightness(this.value)">
+                <div style="flex:1"></div>
             </div>
             <div class="toggle-row" style="margin-top:10px">
                 <span id="btn-ddt-label">Direct Draw</span>
                 <button id="btn-ddt" onclick="toggleDDT()">DDT: AUTO</button>
             </div>
-            <div class="toggle-row">
-                <span>Touch Enabled</span>
-                <input type="checkbox" id="chk-touch" onchange="toggleTouch()">
-            </div>
+            <!-- touch controls removed -->
             <div class="row" style="margin-top:10px">
                 <button class="btn-blue" onclick="syncCfg()">SYNC ALERT CONFIG</button>
                 <button style="background:#444" onclick="reconnectBLE()">RECONNECT</button>
@@ -254,17 +246,12 @@
                 document.getElementById('def-amber-t').value = Math.floor(parseInt(p[2]) / 60);
                 document.getElementById('def-red-t').value = Math.floor(parseInt(p[3]) / 60);
                 
-                document.getElementById('bright-slider').value = p[4];
                 document.getElementById('def-amber-msg').value = p[5] || "";
                 document.getElementById('def-red-msg').value = p[6] || "";
-                // optional flags: directDrawTimer and touchEnabled
+                // optional flag: directDrawTimer
                 if (p.length >= 8) {
                     const ddt = parseInt(p[7]);
                     document.getElementById('btn-ddt').innerText = ddt ? 'DDT: ON' : 'DDT: OFF';
-                }
-                if (p.length >= 9) {
-                    const tch = parseInt(p[8]);
-                    document.getElementById('chk-touch').checked = (tch === 1);
                 }
                 return;
             }
@@ -339,17 +326,7 @@
             sendCmd(`MSG:${txt}|${dur}|${fs}|${fl}|${col}`);
         }
 
-        function setBrightness(v) {
-            sendCmd(`BRIGHT:${v}`);
-        }
-
-        function setBrightPreset(p) {
-            sendCmd(`BRIGHT:${p}`);
-            // reflect on slider
-            if (p === 'LOW') document.getElementById('bright-slider').value = 64;
-            else if (p === 'MID') document.getElementById('bright-slider').value = 128;
-            else document.getElementById('bright-slider').value = 255;
-        }
+        // brightness controls removed
 
         function reconnectBLE() {
             if (bluetoothDevice && bluetoothDevice.gatt && bluetoothDevice.gatt.connected) {
@@ -365,10 +342,7 @@
             sendCmd('DDT:' + (on ? '1' : '0'));
         }
 
-        function toggleTouch() {
-            const chk = document.getElementById('chk-touch');
-            sendCmd('TOUCH:' + (chk.checked ? '1' : '0'));
-        }
+        // touch controls removed
 
         function syncCfg() {
             const at = document.getElementById('def-amber-t').value * 60;
