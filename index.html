@@ -20,6 +20,8 @@
         /* Messages match device size and sit at the bottom centered (reduced for preview) */
         #p-msg { position:absolute; bottom:8%; left:0; width:100%; display:flex; justify-content:center; align-items:center; font-family: 'Poppins', system-ui, sans-serif; font-size: 18px; text-align: center; overflow:hidden; white-space:nowrap; }
         .screen.msg-active #p-time { transform: translateY(-12%); }
+        /* Center full-screen messages vertically within the screen */
+        .screen.msg-active #p-msg { top:50%; bottom:auto; transform: translateY(-50%); }
         #p-time { transition: transform 160ms ease; }
         /* Scrolling inner span */
         #p-msg > span { display: inline-block; white-space:nowrap; }
