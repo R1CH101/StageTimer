@@ -13,12 +13,13 @@
         /* Preview */
         #preview-container { width: 100%; height: 160px; background: #000; display: flex; flex-direction:column; align-items: center; justify-content: center; border-bottom: 2px solid #333; position: sticky; top:0; z-index:10; }
         /* Device-mock preview to resemble the real display (aspect ratio, font, scrolling) */
-        .device-mock { width: 92%; max-width:720px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; }
-        #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: 3rem; font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; }
+        .device-mock { width: 96%; max-width:720px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; padding:0; }
+        #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: 6rem; font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; }
         #p-msg { font-family: 'Poppins', system-ui, sans-serif; font-size: 1rem; margin-top: 6px; text-align: left; height: 1.2em; overflow:hidden; white-space:nowrap; width: 92%; }
         /* Scrolling inner span */
         #p-msg > span { display: inline-block; white-space:nowrap; }
-        .timer-bar { position:absolute; left:0; right:0; bottom:6%; height:6%; background: rgba(255,255,255,0.06); }
+        .timer-bar { position:absolute; left:0; right:0; bottom:0; height:8%; background: rgba(255,255,255,0.06); }
+        .timer-bar-fill { height:100%; width:0%; background: linear-gradient(90deg, #ffffff 0%, #ffffff 100%); }
         .timer-bar-fill { height:100%; width:0%; background: linear-gradient(90deg, #ffffff 0%, #ffffff 100%); }
         .status-bar.off { color: var(--danger); font-weight: bold; background: #300; }
 
@@ -347,16 +348,16 @@
         function setupScrollingIfNeeded() {
             const txt = pMsgInner.innerText || '';
             // reset
-            scrollState.pos = 0; scrollState.lastTs = performance.now();
+            scrollState.lastTs = performance.now();
             // Measure widths
-            // Temporarily ensure span is inline to measure
             pMsgInner.style.transition = 'none';
             pMsgInner.style.transform = 'translateX(0px)';
             const spanWidth = pMsgInner.getBoundingClientRect().width;
             const contWidth = pMsgEl.getBoundingClientRect().width;
             scrollState.width = spanWidth; scrollState.containerWidth = contWidth;
             if (spanWidth > contWidth) {
-                scrollState.enabled = true; scrollState.pos = 0; startScroller();
+                // start with text off-screen to the right like device
+                scrollState.enabled = true; scrollState.pos = contWidth; startScroller();
             } else {
                 scrollState.enabled = false; pMsgInner.style.transform = 'translateX(0px)'; stopScroller();
             }
