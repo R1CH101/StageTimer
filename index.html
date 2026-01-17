@@ -13,14 +13,14 @@
         /* Preview */
         #preview-container { width: 100%; height: 160px; background: #000; display: flex; flex-direction:column; align-items: center; justify-content: center; border-bottom: 2px solid #333; position: sticky; top:0; z-index:10; }
         /* Device-mock preview to resemble the real display (aspect ratio, font, scrolling) */
-        .device-mock { width: 96%; max-width:720px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; padding:0; }
+        .device-mock { width: 100%; max-width:420px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; padding:0; box-sizing:border-box; }
         /* Timer should match device: large, centered, ~70% width */
-        #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: clamp(56px, 12vw, 160px); font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; width:70%; text-align:center; display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; font-variant-numeric: tabular-nums; -webkit-font-feature-settings: "tnum" 1; font-feature-settings: "tnum" 1; letter-spacing: -0.02em; }
-        /* Messages match device size */
-        #p-msg { font-family: 'Poppins', system-ui, sans-serif; font-size: 24px; margin-top: 6px; text-align: left; height: 1.2em; overflow:hidden; white-space:nowrap; width: 92%; }
+        #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: clamp(64px, 20vw, 220px); font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; max-width:70%; width:70%; text-align:center; display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; font-variant-numeric: tabular-nums; -webkit-font-feature-settings: "tnum" 1; font-feature-settings: "tnum" 1; letter-spacing: -0.02em; }
+        /* Messages match device size and sit at the bottom centered */
+        #p-msg { position:absolute; bottom:8%; left:0; width:100%; display:flex; justify-content:center; align-items:center; font-family: 'Poppins', system-ui, sans-serif; font-size: 24px; text-align: center; overflow:hidden; white-space:nowrap; }
         /* Scrolling inner span */
         #p-msg > span { display: inline-block; white-space:nowrap; }
-        .timer-bar { position:absolute; left:0; right:0; bottom:0; height:4%; background: rgba(255,255,255,0.04); }
+        .timer-bar { position:absolute; left:0; right:0; bottom:0; height:3%; background: rgba(255,255,255,0.04); }
         .timer-bar-fill { height:100%; width:0%; background: linear-gradient(90deg, #ffffff 0%, #ffffff 100%); }
         .timer-bar-fill { height:100%; width:0%; background: linear-gradient(90deg, #ffffff 0%, #ffffff 100%); }
         .status-bar.off { color: var(--danger); font-weight: bold; background: #300; }
@@ -100,10 +100,10 @@
 <body>
 
     <div id="preview-container">
-        <div class="device-mock">
+            <div class="device-mock">
             <div id="p-time">--:--</div>
             <div id="p-msg"><span></span></div>
-            <div class="timer-bar"><div class="timer-bar-fill" id="timer-fill"></div></div>
+            <div class="timer-bar" id="timer-bar"><div class="timer-bar-fill" id="timer-fill"></div></div>
         </div>
         
     </div>
@@ -213,6 +213,7 @@
         const pMsgEl = document.getElementById('p-msg');
         const pMsgInner = pMsgEl.querySelector('span');
         const timerFill = document.getElementById('timer-fill');
+        const timerBar = document.getElementById('timer-bar');
         const deviceMock = document.querySelector('.device-mock');
         
         let currentSec = 0;
@@ -339,6 +340,13 @@
                 if (pMsgInner.innerText !== newMsg) {
                     pMsgInner.innerText = newMsg;
                     setupScrollingIfNeeded();
+                }
+
+                // Hide timer bar when a message is active or when full-screen message
+                if (newMsg && newMsg.length > 0 || isFs) {
+                    if (timerBar) timerBar.style.display = 'none';
+                } else {
+                    if (timerBar) timerBar.style.display = 'block';
                 }
                 
                 let timeParts = p[0].replace('-','').split(':');
