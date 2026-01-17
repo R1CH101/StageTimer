@@ -96,21 +96,7 @@
             <div id="p-time">--:--</div>
             <div id="p-msg"></div>
         </div>
-        <div style="width:92%; max-width:720px; margin-top:6px; display:flex; gap:8px; align-items:center; justify-content:center;">
-            <div style="color:#aaa; font-size:0.85rem">Preview Settings:</div>
-            <label style="color:#ccc; font-size:0.85rem">Font Size</label>
-            <input id="previewFontSize" type="range" min="18" max="80" value="48" style="width:140px">
-            <label style="color:#ccc; font-size:0.85rem">Aspect</label>
-            <select id="previewAspect" style="width:90px">
-                <option value="land">Landscape (wider)</option>
-                <option value="wide">Wide</option>
-                <option value="tall">Tall</option>
-            </select>
-            <label style="color:#ccc; font-size:0.85rem">Scroll</label>
-            <input id="previewScroll" type="checkbox">
-            <label style="color:#ccc; font-size:0.85rem">Speed</label>
-            <input id="previewSpeed" type="range" min="20" max="200" value="60" style="width:100px">
-        </div>
+        
     </div>
     <div class="status-bar" id="status">Tap Connect</div>
     <button onclick="connectBLE()" id="btn-conn" class="btn-blue" style="border-radius:0">CONNECT</button>
@@ -214,58 +200,9 @@
         const CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
         let bluetoothDevice;
         let char;
-        // Preview controls
-        const previewFontSize = document.getElementById('previewFontSize');
-        const previewAspect = document.getElementById('previewAspect');
-        const previewScroll = document.getElementById('previewScroll');
-        const previewSpeed = document.getElementById('previewSpeed');
         const pTimeEl = document.getElementById('p-time');
         const pMsgEl = document.getElementById('p-msg');
         const deviceMock = document.querySelector('.device-mock');
-
-        function applyPreviewSettings() {
-            const sz = parseInt(previewFontSize.value);
-            pTimeEl.style.fontSize = (sz * 0.9) + 'px';
-            pMsgEl.style.fontSize = Math.max(12, Math.round(sz * 0.28)) + 'px';
-            const asp = previewAspect.value;
-            if (asp === 'land') { deviceMock.style.width = '92%'; deviceMock.style.height = '84%'; }
-            else if (asp === 'wide') { deviceMock.style.width = '98%'; deviceMock.style.height = '72%'; }
-            else { deviceMock.style.width = '76%'; deviceMock.style.height = '96%'; }
-            updatePreviewScroll();
-        }
-
-        function updatePreviewScroll() {
-            // Stop any transition
-            pMsgEl.style.transition = 'none';
-            pMsgEl.style.transform = 'translateX(0px)';
-            if (!previewScroll.checked) return;
-            requestAnimationFrame(() => startPreviewScroll());
-        }
-
-        let previewScrollAnim = null;
-        function startPreviewScroll() {
-            if (previewScrollAnim) cancelAnimationFrame(previewScrollAnim);
-            const speed = parseInt(previewSpeed.value); // px/sec
-            const containerW = deviceMock.clientWidth;
-            const textW = pMsgEl.scrollWidth;
-            if (textW <= containerW) return;
-            let x = 0;
-            function step(ts) {
-                x -= (speed / 60); // approximate per-frame
-                if (x < -textW) x = containerW;
-                pMsgEl.style.transform = `translateX(${x}px)`;
-                previewScrollAnim = requestAnimationFrame(step);
-            }
-            previewScrollAnim = requestAnimationFrame(step);
-        }
-
-        // Wire preview controls
-        previewFontSize.addEventListener('input', applyPreviewSettings);
-        previewAspect.addEventListener('change', applyPreviewSettings);
-        previewScroll.addEventListener('change', updatePreviewScroll);
-        previewSpeed.addEventListener('input', updatePreviewScroll);
-        // initialize
-        applyPreviewSettings();
         
         let currentSec = 0;
         let totalSec = 0; 
