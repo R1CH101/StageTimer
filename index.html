@@ -58,6 +58,17 @@
         .safe-grn.selected { background: var(--success); color:#000; }
         .safe-blk.selected { background: #000; color:#fff; }
 
+        /* Mobile responsiveness */
+        @media (max-width: 600px) {
+            #preview-container { height: 140px; }
+            #p-time { font-size: 3rem; }
+            #p-msg { font-size: 1rem; }
+            .grid-4 { grid-template-columns: repeat(2, 1fr); }
+            .row, .toggle-row { flex-direction: column; }
+            .row > button, .grid-4 button, button { width: 100%; }
+            .container { padding: 12px; }
+        }
+
     </style>
 </head>
 <body>
@@ -128,10 +139,7 @@
             <div class="row">
                 <div style="flex:1"></div>
             </div>
-            <div class="toggle-row" style="margin-top:10px">
-                <span id="btn-ddt-label">Direct Draw</span>
-                <button id="btn-ddt" onclick="toggleDDT()">DDT: AUTO</button>
-            </div>
+            <!-- Direct Draw forced on; control removed -->
             <!-- touch controls removed -->
             <div class="row" style="margin-top:10px">
                 <button class="btn-blue" onclick="syncCfg()">SYNC ALERT CONFIG</button>
@@ -248,11 +256,7 @@
                 
                 document.getElementById('def-amber-msg').value = p[5] || "";
                 document.getElementById('def-red-msg').value = p[6] || "";
-                // optional flag: directDrawTimer
-                if (p.length >= 8) {
-                    const ddt = parseInt(p[7]);
-                    document.getElementById('btn-ddt').innerText = ddt ? 'DDT: ON' : 'DDT: OFF';
-                }
+                // Direct Draw is forced on in device firmware
                 return;
             }
 
@@ -335,12 +339,7 @@
             connectBLE();
         }
 
-        function toggleDDT() {
-            const btn = document.getElementById('btn-ddt');
-            const on = btn.innerText.indexOf('ON') === -1; // flip
-            btn.innerText = on ? 'DDT: ON' : 'DDT: OFF';
-            sendCmd('DDT:' + (on ? '1' : '0'));
-        }
+        // Direct Draw control removed from web UI
 
         // touch controls removed
 
