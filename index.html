@@ -14,6 +14,7 @@
         #preview-container { width: 100%; height: 160px; background: #000; display: flex; flex-direction:column; align-items: center; justify-content: center; border-bottom: 2px solid #333; position: sticky; top:0; z-index:10; }
         /* Device-mock preview to resemble the real display (aspect ratio, font, scrolling) */
         .device-mock { width: 100%; max-width:420px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; padding:0; box-sizing:border-box; max-height:30vh; }
+        .device-mock .screen { width: 92%; height: 92%; max-width: 100%; background: #000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; box-sizing:border-box; border-radius:6px; overflow:hidden; }
         /* Timer should match device: large, centered, ~70% width */
         #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: clamp(64px, 20vw, 220px); font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; text-align:center; display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; font-variant-numeric: tabular-nums; -webkit-font-feature-settings: "tnum" 1; font-feature-settings: "tnum" 1; letter-spacing: -0.02em; }
         /* Messages match device size and sit at the bottom centered */
@@ -100,12 +101,13 @@
 <body>
 
     <div id="preview-container">
-            <div class="device-mock">
-            <div id="p-time">--:--</div>
-            <div id="p-msg"><span></span></div>
-            <div class="timer-bar" id="timer-bar"><div class="timer-bar-fill" id="timer-fill"></div></div>
+        <div class="device-mock">
+            <div class="screen" id="screen">
+                <div id="p-time">--:--</div>
+                <div id="p-msg"><span></span></div>
+                <div class="timer-bar" id="timer-bar"><div class="timer-bar-fill" id="timer-fill"></div></div>
+            </div>
         </div>
-        
     </div>
     <div class="status-bar" id="status">Tap Connect</div>
     <button onclick="connectBLE()" id="btn-conn" class="btn-blue" style="border-radius:0">CONNECT</button>
@@ -226,7 +228,9 @@
         // Fit the timer text so it occupies most of the preview width (≈92%).
         function fitTimerToWidth() {
             if (!pTimeEl || !deviceMock) return;
-            const avail = deviceMock.clientWidth * 0.7; // target width (~70%)
+            const screenEl = document.getElementById('screen');
+            const baseWidth = (screenEl && screenEl.clientWidth) ? screenEl.clientWidth : deviceMock.clientWidth;
+            const avail = baseWidth * 0.7; // target width (~70%)
             const text = pTimeEl.innerText || '--:--';
             // binary search for best font-size
             let lo = 8, hi = 800, best = lo;
@@ -277,6 +281,8 @@
                 document.getElementById('status').classList.remove('off');
                 document.getElementById('status').style.color = "#22c55e";
                 document.getElementById('btn-conn').style.display = 'none';
+                // Fit timer once after connecting so font-size is stable (avoid resizing each tick)
+                fitTimerToWidth();
                 
                 // Fetch current config from device
                 setTimeout(() => { sendCmd("GET_CFG"); }, 500);
@@ -298,6 +304,7 @@
             document.getElementById('status').classList.add('off');
             document.getElementById('btn-conn').style.display = 'block';
             document.getElementById('preview-container').style.background = "#000";
+            const screenEl = document.getElementById('screen'); if (screenEl) screenEl.style.background = '#000';
             document.getElementById('p-time').innerText = "--:--";
             char = null;
         }
@@ -316,6 +323,8 @@
                 
                 document.getElementById('def-amber-t').value = Math.floor(parseInt(p[2]) / 60);
                 document.getElementById('def-red-t').value = Math.floor(parseInt(p[3]) / 60);
+                // Adjust timer sizing now that we know device config
+                fitTimerToWidth();
                 
                 document.getElementById('def-amber-msg').value = p[5] || "";
                 document.getElementById('def-red-msg').value = p[6] || "";
@@ -325,32 +334,38 @@
 
             // Packet: TIME|BG|TXT|MSG|IS_FS
             if(p.length >= 5) {
-                document.getElementById('preview-container').style.background = p[1];
-                // Also update inner mock device background so preview matches device exactly
-                deviceMock.style.background = p[1];
+                // Keep outer preview container black (letterbox); set inner screen color to device bg
+                const screenEl = document.getElementById('screen');
+                if (screenEl) screenEl.style.background = p[1];
                 const timeEl = document.getElementById('p-time');
                 const msgEl = document.getElementById('p-msg');
                 const isFs = (p[4] === "1");
 
+                // Use inner span for scrolling measurement/animation
+                const newMsg = p[3] || "";
                 if (isFs) {
+                    // Full-screen: hide timer and render multiline message (no scrolling)
                     timeEl.style.display = 'none';
-                    msgEl.style.fontSize = "1.5rem";
-                    msgEl.style.fontWeight = "bold";
-                    msgEl.style.height = "auto";
+                    stopScroller();
+                    pMsgInner.style.whiteSpace = 'normal';
+                    pMsgInner.innerHTML = (newMsg + '').replace(/\n/g, '<br>');
+                    msgEl.style.fontSize = '56px';
+                    msgEl.style.fontWeight = '700';
+                    msgEl.style.height = 'auto';
+                    // center lines
+                    pMsgEl.style.justifyContent = 'center';
+                    pMsgEl.style.alignItems = 'center';
                 } else {
                     timeEl.style.display = 'block';
                     timeEl.style.color = p[2];
                     timeEl.innerText = p[0];
-                    // adjust font to fill ~70% of the preview width
-                    fitTimerToWidth();
-                    msgEl.style.fontSize = "1.2rem";
-                    msgEl.style.fontWeight = "normal";
-                    msgEl.style.height = "1.5em";
+                    msgEl.style.fontSize = '48px';
+                    msgEl.style.fontWeight = '400';
+                    msgEl.style.height = '1.5em';
+                    pMsgInner.style.whiteSpace = 'nowrap';
                 }
 
                 msgEl.style.color = p[2];
-                // Use inner span for scrolling measurement/animation
-                const newMsg = p[3] || "";
                         // Update timer bar based on current/total seconds
                 // totalSec is set from CFG_DATA earlier; guard divide by zero
                 if (totalSec > 0) {
