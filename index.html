@@ -15,12 +15,12 @@
         /* Device-mock preview to resemble the real display (aspect ratio, font, scrolling) */
         .device-mock { width: 96%; max-width:720px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; padding:0; }
         /* Timer should match device: large, centered, ~70% width */
-        #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: clamp(56px, 10vw, 160px); font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; width:70%; text-align:center; display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; }
+        #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: clamp(56px, 12vw, 160px); font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; width:70%; text-align:center; display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; font-variant-numeric: tabular-nums; -webkit-font-feature-settings: "tnum" 1; font-feature-settings: "tnum" 1; letter-spacing: -0.02em; }
         /* Messages match device size */
         #p-msg { font-family: 'Poppins', system-ui, sans-serif; font-size: 24px; margin-top: 6px; text-align: left; height: 1.2em; overflow:hidden; white-space:nowrap; width: 92%; }
         /* Scrolling inner span */
         #p-msg > span { display: inline-block; white-space:nowrap; }
-        .timer-bar { position:absolute; left:0; right:0; bottom:0; height:4%; background: rgba(255,255,255,0.06); }
+        .timer-bar { position:absolute; left:0; right:0; bottom:0; height:4%; background: rgba(255,255,255,0.04); }
         .timer-bar-fill { height:100%; width:0%; background: linear-gradient(90deg, #ffffff 0%, #ffffff 100%); }
         .timer-bar-fill { height:100%; width:0%; background: linear-gradient(90deg, #ffffff 0%, #ffffff 100%); }
         .status-bar.off { color: var(--danger); font-weight: bold; background: #300; }
@@ -300,6 +300,8 @@
             // Packet: TIME|BG|TXT|MSG|IS_FS
             if(p.length >= 5) {
                 document.getElementById('preview-container').style.background = p[1];
+                // Also update inner mock device background so preview matches device exactly
+                deviceMock.style.background = p[1];
                 const timeEl = document.getElementById('p-time');
                 const msgEl = document.getElementById('p-msg');
                 const isFs = (p[4] === "1");
@@ -321,7 +323,7 @@
                 msgEl.style.color = p[2];
                 // Use inner span for scrolling measurement/animation
                 const newMsg = p[3] || "";
-                // Update timer bar based on current/total seconds
+                        // Update timer bar based on current/total seconds
                 // totalSec is set from CFG_DATA earlier; guard divide by zero
                 if (totalSec > 0) {
                     const timeParts = p[0].replace('-','').split(':');
@@ -329,6 +331,8 @@
                         const sec = (parseInt(timeParts[0]) * 60) + parseInt(timeParts[1]);
                         const pct = Math.max(0, Math.min(100, Math.round((sec / totalSec) * 100)));
                         timerFill.style.width = pct + '%';
+                        // set fill color to text color so it mirrors device
+                        timerFill.style.background = p[2];
                     }
                 }
                 // Update message text and start scrolling only when message changed
