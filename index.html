@@ -4,16 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Pro Timer</title>
+    <!-- Use Google Poppins to better mirror device Poppins VLW appearance -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #121212; --panel: #1e1e1e; --text: #fff; --accent: #3b82f6; --danger: #ef4444; --warn: #eab308; --success: #22c55e; }
         body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; padding-bottom: 20px;}
 
         /* Preview */
-        #preview-container { width: 100%; height: 110px; background: #000; display: flex; flex-direction:column; align-items: center; justify-content: center; border-bottom: 2px solid #333; position: sticky; top:0; z-index:10; }
-        #p-time { font-size: 3rem; font-weight: 800; line-height: 1; margin:0; transition: color 0.2s; }
-        #p-msg { font-size: 1rem; margin-top: 4px; text-align: center; height: 1.2em; overflow:hidden; }
-
-        .status-bar { font-size: 0.75rem; color: #666; width:100%; text-align:center; background:#111; padding:4px 0; }
+        #preview-container { width: 100%; height: 160px; background: #000; display: flex; flex-direction:column; align-items: center; justify-content: center; border-bottom: 2px solid #333; position: sticky; top:0; z-index:10; }
+        /* Device-mock preview to resemble the real display (aspect ratio, font, scrolling) */
+        .device-mock { width: 92%; max-width:720px; height: 84%; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+        #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: 3rem; font-weight: 800; line-height: 1; margin:0; transition: color 0.12s; }
+        #p-msg { font-family: 'Poppins', system-ui, sans-serif; font-size: 1rem; margin-top: 6px; text-align: center; height: 1.2em; overflow:hidden; white-space:nowrap; }
         .status-bar.off { color: var(--danger); font-weight: bold; background: #300; }
 
         /* Layout */
@@ -90,8 +92,25 @@
 <body>
 
     <div id="preview-container">
-        <div id="p-time">--:--</div>
-        <div id="p-msg"></div>
+        <div class="device-mock">
+            <div id="p-time">--:--</div>
+            <div id="p-msg"></div>
+        </div>
+        <div style="width:92%; max-width:720px; margin-top:6px; display:flex; gap:8px; align-items:center; justify-content:center;">
+            <div style="color:#aaa; font-size:0.85rem">Preview Settings:</div>
+            <label style="color:#ccc; font-size:0.85rem">Font Size</label>
+            <input id="previewFontSize" type="range" min="18" max="80" value="48" style="width:140px">
+            <label style="color:#ccc; font-size:0.85rem">Aspect</label>
+            <select id="previewAspect" style="width:90px">
+                <option value="land">Landscape (wider)</option>
+                <option value="wide">Wide</option>
+                <option value="tall">Tall</option>
+            </select>
+            <label style="color:#ccc; font-size:0.85rem">Scroll</label>
+            <input id="previewScroll" type="checkbox">
+            <label style="color:#ccc; font-size:0.85rem">Speed</label>
+            <input id="previewSpeed" type="range" min="20" max="200" value="60" style="width:100px">
+        </div>
     </div>
     <div class="status-bar" id="status">Tap Connect</div>
     <button onclick="connectBLE()" id="btn-conn" class="btn-blue" style="border-radius:0">CONNECT</button>
@@ -195,6 +214,58 @@
         const CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
         let bluetoothDevice;
         let char;
+        // Preview controls
+        const previewFontSize = document.getElementById('previewFontSize');
+        const previewAspect = document.getElementById('previewAspect');
+        const previewScroll = document.getElementById('previewScroll');
+        const previewSpeed = document.getElementById('previewSpeed');
+        const pTimeEl = document.getElementById('p-time');
+        const pMsgEl = document.getElementById('p-msg');
+        const deviceMock = document.querySelector('.device-mock');
+
+        function applyPreviewSettings() {
+            const sz = parseInt(previewFontSize.value);
+            pTimeEl.style.fontSize = (sz * 0.9) + 'px';
+            pMsgEl.style.fontSize = Math.max(12, Math.round(sz * 0.28)) + 'px';
+            const asp = previewAspect.value;
+            if (asp === 'land') { deviceMock.style.width = '92%'; deviceMock.style.height = '84%'; }
+            else if (asp === 'wide') { deviceMock.style.width = '98%'; deviceMock.style.height = '72%'; }
+            else { deviceMock.style.width = '76%'; deviceMock.style.height = '96%'; }
+            updatePreviewScroll();
+        }
+
+        function updatePreviewScroll() {
+            // Stop any transition
+            pMsgEl.style.transition = 'none';
+            pMsgEl.style.transform = 'translateX(0px)';
+            if (!previewScroll.checked) return;
+            requestAnimationFrame(() => startPreviewScroll());
+        }
+
+        let previewScrollAnim = null;
+        function startPreviewScroll() {
+            if (previewScrollAnim) cancelAnimationFrame(previewScrollAnim);
+            const speed = parseInt(previewSpeed.value); // px/sec
+            const containerW = deviceMock.clientWidth;
+            const textW = pMsgEl.scrollWidth;
+            if (textW <= containerW) return;
+            let x = 0;
+            function step(ts) {
+                x -= (speed / 60); // approximate per-frame
+                if (x < -textW) x = containerW;
+                pMsgEl.style.transform = `translateX(${x}px)`;
+                previewScrollAnim = requestAnimationFrame(step);
+            }
+            previewScrollAnim = requestAnimationFrame(step);
+        }
+
+        // Wire preview controls
+        previewFontSize.addEventListener('input', applyPreviewSettings);
+        previewAspect.addEventListener('change', applyPreviewSettings);
+        previewScroll.addEventListener('change', updatePreviewScroll);
+        previewSpeed.addEventListener('input', updatePreviewScroll);
+        // initialize
+        applyPreviewSettings();
         
         let currentSec = 0;
         let totalSec = 0; 
