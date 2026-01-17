@@ -13,9 +13,13 @@
         /* Preview */
         #preview-container { width: 100%; height: 160px; background: #000; display: flex; flex-direction:column; align-items: center; justify-content: center; border-bottom: 2px solid #333; position: sticky; top:0; z-index:10; }
         /* Device-mock preview to resemble the real display (aspect ratio, font, scrolling) */
-        .device-mock { width: 92%; max-width:720px; height: 84%; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-        #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: 3rem; font-weight: 800; line-height: 1; margin:0; transition: color 0.12s; }
-        #p-msg { font-family: 'Poppins', system-ui, sans-serif; font-size: 1rem; margin-top: 6px; text-align: center; height: 1.2em; overflow:hidden; white-space:nowrap; }
+        .device-mock { width: 92%; max-width:720px; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; }
+        #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: 3rem; font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; }
+        #p-msg { font-family: 'Poppins', system-ui, sans-serif; font-size: 1rem; margin-top: 6px; text-align: left; height: 1.2em; overflow:hidden; white-space:nowrap; width: 92%; }
+        /* Scrolling inner span */
+        #p-msg > span { display: inline-block; white-space:nowrap; }
+        .timer-bar { position:absolute; left:0; right:0; bottom:6%; height:6%; background: rgba(255,255,255,0.06); }
+        .timer-bar-fill { height:100%; width:0%; background: linear-gradient(90deg, #ffffff 0%, #ffffff 100%); }
         .status-bar.off { color: var(--danger); font-weight: bold; background: #300; }
 
         /* Layout */
@@ -64,7 +68,8 @@
 
         /* Responsive tweaks */
         @media (max-width: 700px) {
-            #preview-container { height: 90px; padding:6px; }
+            #preview-container { height: auto; padding:6px; }
+            .device-mock { aspect-ratio: 4 / 3; }
             #p-time { font-size: 2rem; }
             #p-msg { font-size: 0.95rem; }
             .grid-4 { grid-template-columns: repeat(2, 1fr); gap:6px; }
@@ -94,7 +99,8 @@
     <div id="preview-container">
         <div class="device-mock">
             <div id="p-time">--:--</div>
-            <div id="p-msg"></div>
+            <div id="p-msg"><span></span></div>
+            <div class="timer-bar"><div class="timer-bar-fill" id="timer-fill"></div></div>
         </div>
         
     </div>
@@ -202,6 +208,8 @@
         let char;
         const pTimeEl = document.getElementById('p-time');
         const pMsgEl = document.getElementById('p-msg');
+        const pMsgInner = pMsgEl.querySelector('span');
+        const timerFill = document.getElementById('timer-fill');
         const deviceMock = document.querySelector('.device-mock');
         
         let currentSec = 0;
@@ -308,7 +316,21 @@
                 }
 
                 msgEl.style.color = p[2];
-                msgEl.innerText = p[3] || "";
+                // Use inner span for scrolling measurement/animation
+                pMsgInner.innerText = p[3] || "";
+                // Update timer bar based on current/total seconds
+                // totalSec is set from CFG_DATA earlier; guard divide by zero
+                if (totalSec > 0) {
+                    const timeParts = p[0].replace('-','').split(':');
+                    if (timeParts.length === 2) {
+                        const sec = (parseInt(timeParts[0]) * 60) + parseInt(timeParts[1]);
+                        const pct = Math.max(0, Math.min(100, Math.round((sec / totalSec) * 100)));
+                        timerFill.style.width = pct + '%';
+                    }
+                }
+
+                // Start/stop scrolling if message overflows
+                setupScrollingIfNeeded();
                 
                 let timeParts = p[0].replace('-','').split(':');
                 if(timeParts.length === 2) {
@@ -319,6 +341,46 @@
                 }
             }
         }
+
+        // Scrolling implementation mirroring device speed (~60px/s)
+        let scrollState = { enabled: false, pos: 0, width: 0, containerWidth: 0, lastTs: 0 };
+        function setupScrollingIfNeeded() {
+            const txt = pMsgInner.innerText || '';
+            // reset
+            scrollState.pos = 0; scrollState.lastTs = performance.now();
+            // Measure widths
+            // Temporarily ensure span is inline to measure
+            pMsgInner.style.transition = 'none';
+            pMsgInner.style.transform = 'translateX(0px)';
+            const spanWidth = pMsgInner.getBoundingClientRect().width;
+            const contWidth = pMsgEl.getBoundingClientRect().width;
+            scrollState.width = spanWidth; scrollState.containerWidth = contWidth;
+            if (spanWidth > contWidth) {
+                scrollState.enabled = true; scrollState.pos = 0; startScroller();
+            } else {
+                scrollState.enabled = false; pMsgInner.style.transform = 'translateX(0px)'; stopScroller();
+            }
+        }
+
+        let scrollerRAF = null;
+        function startScroller() {
+            if (scrollerRAF) return;
+            scrollState.lastTs = performance.now();
+            function step(ts) {
+                const dt = (ts - scrollState.lastTs) / 1000.0;
+                scrollState.lastTs = ts;
+                const speed = 60; // pixels per second, match device
+                scrollState.pos -= speed * dt;
+                if (-scrollState.pos > scrollState.width) {
+                    // reset to start after a short pause
+                    scrollState.pos = scrollState.containerWidth;
+                }
+                pMsgInner.style.transform = `translateX(${Math.floor(scrollState.pos)}px)`;
+                scrollerRAF = requestAnimationFrame(step);
+            }
+            scrollerRAF = requestAnimationFrame(step);
+        }
+        function stopScroller() { if (scrollerRAF) { cancelAnimationFrame(scrollerRAF); scrollerRAF = null; } }
 
         async function sendCmd(c) {
             if(!char) return;
