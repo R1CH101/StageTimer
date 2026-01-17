@@ -17,8 +17,8 @@
         .device-mock .screen { width: 92%; height: 92%; max-width: 100%; background: #000; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; aspect-ratio: 4 / 3; box-sizing:border-box; border-radius:6px; overflow:hidden; }
         /* Timer should match device: large, centered, ~70% width */
         #p-time { font-family: 'Poppins', system-ui, sans-serif; font-size: clamp(64px, 20vw, 220px); font-weight: 400; line-height: 1; margin:0; transition: color 0.12s; text-align:center; display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; font-variant-numeric: tabular-nums; -webkit-font-feature-settings: "tnum" 1; font-feature-settings: "tnum" 1; letter-spacing: -0.02em; }
-        /* Messages match device size and sit at the bottom centered */
-        #p-msg { position:absolute; bottom:8%; left:0; width:100%; display:flex; justify-content:center; align-items:center; font-family: 'Poppins', system-ui, sans-serif; font-size: 36px; text-align: center; overflow:hidden; white-space:nowrap; }
+        /* Messages match device size and sit at the bottom centered (reduced for preview) */
+        #p-msg { position:absolute; bottom:8%; left:0; width:100%; display:flex; justify-content:center; align-items:center; font-family: 'Poppins', system-ui, sans-serif; font-size: 18px; text-align: center; overflow:hidden; white-space:nowrap; }
         .screen.msg-active #p-time { transform: translateY(-12%); }
         #p-time { transition: transform 160ms ease; }
         /* Scrolling inner span */
@@ -349,22 +349,32 @@
                     // Full-screen: hide timer and render multiline message (no scrolling)
                     timeEl.style.display = 'none';
                     stopScroller();
+                    // enable wrapping, center-align and allow the span to be block-level for proper multiline layout
                     pMsgInner.style.whiteSpace = 'normal';
+                    pMsgInner.style.display = 'block';
+                    pMsgInner.style.width = '86%';
+                    pMsgInner.style.wordBreak = 'break-word';
+                    pMsgInner.style.textAlign = 'center';
+                    // use innerHTML so incoming explicit newlines are preserved as <br>
                     pMsgInner.innerHTML = (newMsg + '').replace(/\n/g, '<br>');
-                    msgEl.style.fontSize = '56px';
+                    msgEl.style.fontSize = '28px';
                     msgEl.style.fontWeight = '700';
                     msgEl.style.height = 'auto';
-                    // center lines
+                    // center lines vertically/horizontally
                     pMsgEl.style.justifyContent = 'center';
                     pMsgEl.style.alignItems = 'center';
                 } else {
                     timeEl.style.display = 'block';
                     timeEl.style.color = p[2];
                     timeEl.innerText = p[0];
-                    msgEl.style.fontSize = '48px';
+                    msgEl.style.fontSize = '24px';
                     msgEl.style.fontWeight = '400';
-                    msgEl.style.height = '1.5em';
+                    msgEl.style.height = '1.2em';
                     pMsgInner.style.whiteSpace = 'nowrap';
+                    // restore inline-block for smooth scrolling
+                    pMsgInner.style.display = 'inline-block';
+                    pMsgInner.style.width = 'auto';
+                    pMsgInner.style.wordBreak = 'normal';
                 }
 
                 msgEl.style.color = p[2];
@@ -381,9 +391,12 @@
                     }
                 }
                 // Update message text and start scrolling only when message changed
-                if (pMsgInner.innerText !== newMsg) {
-                    pMsgInner.innerText = newMsg;
-                    setupScrollingIfNeeded();
+                // Do not overwrite full-screen HTML (we already set innerHTML above)
+                if (!isFs) {
+                    if (pMsgInner.innerText !== newMsg) {
+                        pMsgInner.innerText = newMsg;
+                        setupScrollingIfNeeded();
+                    }
                 }
 
                 // Hide timer bar when a message is active or when full-screen message
