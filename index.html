@@ -223,6 +223,27 @@
         let redTriggered = false;
         let selectedMsgColor = -1;
 
+        // Fit the timer text so it occupies ~70% of the preview width.
+        function fitTimerToWidth() {
+            if (!pTimeEl || !deviceMock) return;
+            const avail = deviceMock.clientWidth * 0.7; // target width
+            const text = pTimeEl.innerText || '--:--';
+            // binary search for best font-size
+            let lo = 10, hi = 400, best = lo;
+            const measEl = pTimeEl;
+            while (lo <= hi) {
+                const mid = Math.floor((lo + hi) / 2);
+                measEl.style.fontSize = mid + 'px';
+                // force reflow measurement
+                const w = measEl.getBoundingClientRect().width;
+                if (w <= avail) { best = mid; lo = mid + 1; }
+                else { hi = mid - 1; }
+            }
+            measEl.style.fontSize = best + 'px';
+        }
+
+        window.addEventListener('resize', () => { fitTimerToWidth(); });
+
         function toggleColorRow() {
             const fs = document.getElementById('chk-fs').checked;
             document.getElementById('color-picker-row').style.display = fs ? 'flex' : 'none';
@@ -316,6 +337,8 @@
                     timeEl.style.display = 'block';
                     timeEl.style.color = p[2];
                     timeEl.innerText = p[0];
+                    // adjust font to fill ~70% of the preview width
+                    fitTimerToWidth();
                     msgEl.style.fontSize = "1.2rem";
                     msgEl.style.fontWeight = "normal";
                     msgEl.style.height = "1.5em";
